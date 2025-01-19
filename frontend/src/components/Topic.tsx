@@ -54,16 +54,28 @@ const TopicPage: React.FC = () => {
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
 
       {/* Top Section with Topic and Timer */}
-      <div className="relative z-10 w-full bg-gray-900/50 backdrop-blur-sm border-b border-white/10 mb-6">
+      <div className="relative z-10 w-full bg-gray-900/50 backdrop-blur-sm border-b border-white/10 mb-2">
         <div className="max-w-7xl mx-auto px-4 py-4 relative">
           {/* Timer */}
-          <div className="absolute top-4 right-4 bg-yellow-500 text-black px-4 py-2 rounded-full flex items-center space-x-2">
+          <div className="absolute top-4 left-4 bg-yellow-500 text-black px-4 py-2 rounded-full flex items-center space-x-2">
             <Clock className="w-5 h-5" />
             <span className="font-semibold">{formatTime(timeLeft)}</span>
           </div>
 
+          {/* Profile */}
+          <div className="absolute top-4 right-4 flex items-center space-x-3">
+            <img
+              src={JSON.parse(localStorage.getItem("user") || "{}")?.picture}
+              alt="User profile"
+              className="w-10 h-10 rounded-full border-2 border-yellow-500"
+            />
+            <span className="font-semibold text-white">
+              {JSON.parse(localStorage.getItem("user") || "{}")?.name}
+            </span>
+          </div>
+
           {/* Topic */}
-          <div className="text-center pr-32">
+          <div className="text-center">
             <h1 className="text-2xl font-bold text-yellow-500 mb-2">
               Discussion Topic
             </h1>
@@ -73,10 +85,10 @@ const TopicPage: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4  h-[calc(100vh-13rem)]">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 h-[calc(100vh-13rem)] ">
         <div className="flex gap-6 h-full ">
           {/* Left Side - Your Video */}
-          <div className="w-2/3 h-full my-16">
+          <div className="w-2/3 h-full mt-16">
             <div className="h-full rounded-2xl overflow-hidden ">
               <Video width="100%" height="100%" maxWidth="none" />
             </div>

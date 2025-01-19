@@ -1,33 +1,57 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from google.oauth2 import id_token
-from google.auth.transport import requests
+from pymongo import MongoClient, errors
+import jwt
 
 app = Flask(__name__)
 CORS(app)
 
-# Replace with your Google Client ID
-GOOGLE_CLIENT_ID = "236465284909-ef5p23aaadb9c6qlc5e2t75qmtvh96e9.apps.googleusercontent.com"
+# MongoDB connection setup
+try:
+    client = MongoClient('mongodb+srv://musicstories10:fK4TalYmpbQv5dvH@v1.lb76o.mongodb.net/?retryWrites=true&w=majority&appName=V1', serverSelectionTimeoutMS=5000)
+    db = client['gd']
+    users_collection = db['users']
+    print("MongoDB connection successful.")
+except errors.ServerSelectionTimeoutError as err:
+    print("Failed to connect to MongoDB:", err)
+    exit(1)
 
 @app.route("/api/auth/google", methods=["POST"])
 def google_sign_in():
     token = request.json.get("token")
     try:
-        # Verify the token with Google's server
-        id_info = id_token.verify_oauth2_token(token, requests.Request(), GOOGLE_CLIENT_ID)
-
+        # Decode token without verification
+        decoded_token = jwt.decode(token, options={"verify_signature": False})
+        
         # Extract user information
         user_info = {
-            "user_id": id_info["sub"],
-            "email": id_info["email"],
-            "name": id_info["name"],
-            "picture": id_info["picture"],
+            "user_id": decoded_token.get("sub"),
+            "email": decoded_token.get("email"),
+            "name": decoded_token.get("name"),
+            "picture": decoded_token.get("picture"),
         }
-        print(user_info)
-        return jsonify({"success": True, "user": user_info})
-    except ValueError as e:
+
+        # Store in MongoDB
+        try:
+            result = users_collection.update_one(
+                {"user_id": user_info["user_id"]},
+                {"$set": user_info},
+                upsert=True
+            )
+            
+            if result.modified_count > 0:
+                print(f"User {user_info['email']} information updated")
+            elif result.upserted_id:
+                print(f"New user {user_info['email']} created")
+                
+            return jsonify({"success": True, "user": user_info})
+        except Exception as e:
+            print(f"Database error: {str(e)}")
+            return jsonify({"success": False, "error": "Database error"}), 500
+
+    except Exception as e:
+        print(f"Token decoding error: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 400
-        print(e)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, port=8000)

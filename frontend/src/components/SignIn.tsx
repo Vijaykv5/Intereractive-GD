@@ -6,7 +6,7 @@ const SignIn: React.FC = () => {
   const navigate = useNavigate();
 
   const handleGoogleSignIn = async (credentialResponse: any) => {
-    console.log("Google Sign-In response:", credentialResponse);
+    console.log("Google Sign-In response:", credentialResponse.credential);
 
     try {
       const res = await fetch('http://localhost:8000/api/auth/google', {
@@ -23,8 +23,8 @@ const SignIn: React.FC = () => {
       if (data.success) {
         // Store user info in localStorage or state management
         localStorage.setItem('user', JSON.stringify(data.user));
-        // Redirect to video page
-        navigate('/video');
+        // Redirect to topic page
+        navigate(`/topic/${data.user.user_id}`);
       } else {
         console.error("Authentication failed:", data.error);
       }
