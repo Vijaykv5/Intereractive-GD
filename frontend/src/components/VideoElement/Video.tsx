@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Video as VideoIcon, VideoOff } from 'lucide-react';
+import axios from 'axios';
 
 
 // qkpv2285;
@@ -13,16 +14,22 @@ interface VideoProps {
 const Video: React.FC<VideoProps> = ({ 
   width = "640px", 
   height = "480px",
-  maxWidth = "none" 
+  maxWidth = "none"
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [error, setError] = useState<string>("");
+  const [userName, setUserName] = useState('');
 
   useEffect(() => {
     startStream();
+    const interval = setInterval(() => {
+      captureScreenshot();
+    }, 30000);
+
     return () => {
+      clearInterval(interval);
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
@@ -46,6 +53,26 @@ const Video: React.FC<VideoProps> = ({
     }
   };
 
+  const captureScreenshot = async () => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const context = canvas.getContext('2d');
+      context?.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      const screenshot = canvas.toDataURL('image/png');
+
+      storeScreenshotInLocalStorage(screenshot);
+    }
+  };
+
+  const storeScreenshotInLocalStorage = (screenshot: string) => {
+    const existingScreenshots = JSON.parse(localStorage.getItem('screenshots') || '[]');
+    existingScreenshots.push(screenshot);
+    localStorage.setItem('screenshots', JSON.stringify(existingScreenshots));
+    console.log('Screenshot stored in local storage:', screenshot);
+  };
+
   const toggleVideo = async () => {
     if (streamRef.current) {
       const videoTrack = streamRef.current.getVideoTracks()[0];
@@ -53,6 +80,16 @@ const Video: React.FC<VideoProps> = ({
         videoTrack.enabled = !videoTrack.enabled;
         setIsVideoOn(!isVideoOn);
       }
+    }
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    try {
+      const response = await axios.post('/api/users', { name: userName });
+      console.log(response.data.message);
+    } catch (error) {
+      console.error('Error storing user name:', error);
     }
   };
 
@@ -97,6 +134,18 @@ const Video: React.FC<VideoProps> = ({
           )}
         </button>
       </div>
+
+      {/* <div>
+        <form onSubmit={handleSubmit}>
+          <input 
+            type="text" 
+            value={userName} 
+            onChange={(e) => setUserName(e.target.value)} 
+            placeholder="Enter your name" 
+          />
+          <button type="submit">Submit</button>
+        </form>
+      </div> */}
     </div>
   );
 };

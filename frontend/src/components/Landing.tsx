@@ -1,176 +1,147 @@
 import React from "react";
-import { MessageCircle, Users, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const LandingPage: React.FC = () => {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-violet-100 to-blue-100 text-gray-800">
+    <div className="min-h-screen bg-black text-white">
+      {/* Background Grid Pattern */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
+
       {/* Header */}
-      <header className="container mx-auto px-4 py-6 flex justify-between items-center">
-        <div className="text-2xl font-bold text-violet-800">
-          Group Discussion
+      <header className="relative z-10 border-b border-white/10">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="text-2xl font-bold text-white">
+                Interactive GD
+              </div>
+            </div>
+            {/* <nav className="hidden md:flex items-center gap-6">
+              <a
+                href="#pricing"
+                className="text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                Pricing
+              </a>
+              <a
+                href="#blog"
+                className="text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                Blog
+              </a>
+              <a
+                href="#affiliate"
+                className="text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                Affiliate Program
+                <span className="ml-1 inline-flex items-center rounded-md bg-yellow-400/10 px-2 py-1 text-xs font-medium text-yellow-500 ring-1 ring-inset ring-yellow-400/20">
+                  New
+                </span>
+              </a>
+            </nav> */}
+            <div className="flex items-center gap-4">
+              <button
+                className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+                onClick={() => navigate("/signin")}
+              >
+                Sign in
+              </button>
+              <button
+                className="px-4 py-2 text-sm bg-yellow-500 text-black rounded-md hover:bg-yellow-400 transition-colors"
+                onClick={() => navigate("/get-started")}
+              >
+                Get Started
+              </button>
+            </div>
+          </div>
         </div>
-        <nav>
-          <ul className="flex space-x-6">
-            <li>
-              <a href="#features" className="hover:text-violet-600">
-                Features
-              </a>
-            </li>
-            <li>
-              <a href="#how-it-works" className="hover:text-violet-600">
-                How it Works
-              </a>
-            </li>
-            <li>
-              <a href="#testimonials" className="hover:text-violet-600">
-                Testimonials
-              </a>
-            </li>
-          </ul>
-        </nav>
       </header>
 
       {/* Hero Section */}
-      <section className="container mx-auto px-4 py-20 text-center">
-        <h1 className="text-5xl font-bold mb-6 text-violet-800">
-          Elevate Your Discussions
-        </h1>
-        <p className="text-xl mb-8 max-w-2xl mx-auto">
-          Join GroundTalk, the premier platform for meaningful conversations and
-          idea sharing.
-        </p>
-        <button
-          onClick={() => navigate("/topic")}
-          className="bg-violet-600 text-white px-8 py-3 rounded-full text-lg font-semibold hover:bg-violet-700 transition duration-300"
-        >
-          Get Started
-        </button>
-      </section>
-
-      {/* Features Section */}
-      <section id="features" className="container mx-auto px-4 py-20">
-        <h2 className="text-3xl font-bold mb-12 text-center text-violet-800">
-          Why Choose GroundTalk?
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <FeatureCard
-            icon={<MessageCircle size={40} />}
-            title="Engaging Discussions"
-            description="Participate in thought-provoking conversations on various topics."
-          />
-          <FeatureCard
-            icon={<Users size={40} />}
-            title="Community Building"
-            description="Connect with like-minded individuals and grow your network."
-          />
-          <FeatureCard
-            icon={<Zap size={40} />}
-            title="Real-time Interactions"
-            description="Experience seamless, real-time discussions with instant updates."
-          />
-        </div>
-      </section>
-
-      {/* How it Works Section */}
-      <section id="how-it-works" className="bg-white py-20">
+      <section className="relative z-10 py-24">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold mb-12 text-center text-violet-800">
-            How It Works
-          </h2>
-          <div className="flex flex-col md:flex-row justify-between items-center space-y-8 md:space-y-0 md:space-x-8">
-            <Step
-              number={1}
-              title="Sign Up"
-              description="Create your account in seconds"
-            />
-            <Step
-              number={2}
-              title="Join Discussions"
-              description="Find topics that interest you"
-            />
-            <Step
-              number={3}
-              title="Share Ideas"
-              description="Contribute to meaningful conversations"
-            />
+          <div className="flex flex-col items-start gap-8 max-w-[720px]">
+            <div className="inline-flex items-center rounded-full border border-yellow-500/20 bg-yellow-500/10 px-3 py-1 text-sm text-yellow-500">
+              <span className="mr-2">✨</span> One-stop solution to practice
+              Group Discussions for your interviews
+            </div>
+            <h1 className="text-5xl font-bold tracking-tight lg:text-7xl">
+              Master <span className="text-yellow-500">Group</span>
+              <br />
+              <span className="text-yellow-500">Discussions with</span>
+              <br />
+              Confidence
+            </h1>
+            <p className="text-xl text-gray-400">
+              Practice, perform, and perfect your group discussion skills with
+              our AI-driven interactive platform—where virtual participants meet
+              real-world impact!
+            </p>
+            <button
+              className="px-6 py-3 text-lg bg-yellow-500 text-black rounded-md hover:bg-yellow-400 transition-colors"
+              onClick={() => navigate("/get-started")}
+            >
+              Get Started →
+            </button>
           </div>
         </div>
       </section>
 
-      {/* Testimonial Section */}
-      <section id="testimonials" className="container mx-auto px-4 py-20">
-        <h2 className="text-3xl font-bold mb-12 text-center text-violet-800">
-          What Our Users Say
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <TestimonialCard
-            quote="GroundTalk has revolutionized how I engage in online discussions. It's a game-changer!"
-            author="Sarah L."
-          />
-          <TestimonialCard
-            quote="The quality of conversations on this platform is unmatched. I've learned so much!"
-            author="Michael R."
-          />
+      {/* Video Examples Grid */}
+      {/* <section className="relative z-10 py-24">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="relative overflow-hidden rounded-2xl bg-gray-900/50 aspect-[4/3]"
+              >
+                <img
+                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot%202025-01-19%20at%201.19.25%E2%80%AFPM-WjCYUOSq3SYj4RwzmbzagAPoweAXhp.png"
+                  alt={`Video example ${i}`}
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                <div className="absolute bottom-4 left-4 right-4">
+                  <h3 className="text-lg font-semibold text-white">
+                    Video Title
+                  </h3>
+                  <p className="text-sm text-gray-400">Description goes here</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      </section>
+      </section> */}
 
       {/* Footer */}
-      <footer className="bg-violet-800 text-white py-8">
-        <div className="container mx-auto px-4 text-center">
-          <p>&copy; 2023 GroundTalk. All rights reserved.</p>
-          <div className="mt-4">
-            <a href="#" className="hover:underline mx-2">
-              Privacy Policy
-            </a>
-            <a href="#" className="hover:underline mx-2">
-              Terms of Service
-            </a>
-            <a href="#" className="hover:underline mx-2">
-              Contact Us
-            </a>
+      <footer className="relative z-10 border-t border-white/10 py-8">
+        <div className="container mx-auto px-4">
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-gray-400">
+              © 2025 Interactive GD. All rights reserved.
+            </p>
+            {/* <div className="flex gap-4">
+              <a
+                href="#privacy"
+                className="text-sm text-gray-400 hover:text-white"
+              >
+                Privacy
+              </a>
+              <a
+                href="#terms"
+                className="text-sm text-gray-400 hover:text-white"
+              >
+                Terms
+              </a>
+            </div> */}
           </div>
         </div>
       </footer>
     </div>
   );
 };
-
-const FeatureCard: React.FC<{
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}> = ({ icon, title, description }) => (
-  <div className="bg-white p-6 rounded-lg shadow-md text-center">
-    <div className="text-violet-600 mb-4 flex justify-center">{icon}</div>
-    <h3 className="text-xl font-semibold mb-2">{title}</h3>
-    <p className="text-gray-600">{description}</p>
-  </div>
-);
-
-const Step: React.FC<{
-  number: number;
-  title: string;
-  description: string;
-}> = ({ number, title, description }) => (
-  <div className="text-center">
-    <div className="bg-violet-600 text-white w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold mb-4 mx-auto">
-      {number}
-    </div>
-    <h3 className="text-xl font-semibold mb-2">{title}</h3>
-    <p className="text-gray-600">{description}</p>
-  </div>
-);
-
-const TestimonialCard: React.FC<{ quote: string; author: string }> = ({
-  quote,
-  author,
-}) => (
-  <div className="bg-white p-6 rounded-lg shadow-md">
-    <p className="text-gray-600 italic mb-4">"{quote}"</p>
-    <p className="font-semibold text-right">- {author}</p>
-  </div>
-);
 
 export default LandingPage;
