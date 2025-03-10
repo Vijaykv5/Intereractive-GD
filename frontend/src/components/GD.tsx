@@ -18,7 +18,7 @@ const topics = [
   "India's Role in Shaping the Global Economy in 2025",
 ];
 
-const TopicPage: React.FC = () => {
+const GD: React.FC = () => {
   const [topic, setTopic] = useState<string>("");
   const [timeLeft, setTimeLeft] = useState<number>(1800); // 30 minutes in seconds
 
@@ -65,7 +65,7 @@ const TopicPage: React.FC = () => {
           {/* Profile */}
           <div className="absolute top-4 right-4 flex items-center space-x-3">
             <img
-              src={JSON.parse(localStorage.getItem("user") || "{}")?.picture}
+              src={JSON.parse(localStorage.getItem("user") || "{}")?.photo_url}
               alt="User profile"
               className="w-10 h-10 rounded-full border-2 border-yellow-500"
             />
@@ -119,4 +119,4 @@ const TopicPage: React.FC = () => {
   );
 };
 
-export default TopicPage;
+export default GD;

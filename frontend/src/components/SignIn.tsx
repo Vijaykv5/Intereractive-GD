@@ -9,7 +9,7 @@ const SignIn: React.FC = () => {
     console.log("Google Sign-In response:", credentialResponse.credential);
 
     try {
-      const res = await fetch('http://localhost:8000/api/auth/google', {
+      const res = await fetch('http://localhost:8080/api/auth/google', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -23,8 +23,8 @@ const SignIn: React.FC = () => {
       if (data.success) {
         // Store user info in localStorage or state management
         localStorage.setItem('user', JSON.stringify(data.user));
-        // Redirect to topic page
-        navigate(`/topic/${data.user.user_id}`);
+        // Redirect to t"opic page
+        navigate("/topic");
       } else {
         console.error("Authentication failed:", data.error);
       }
