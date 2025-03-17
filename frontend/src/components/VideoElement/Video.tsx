@@ -1,38 +1,84 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Video as VideoIcon, VideoOff } from 'lucide-react';
 import axios from 'axios';
-
+import { captureCompressedImage, uploadScreenshot } from '../../utils/imageUtils';
 
 interface VideoProps {
   width?: string;
   height?: string;
   maxWidth?: string;
+  topic?: string;
 }
 
 const Video: React.FC<VideoProps> = ({ 
-  width = "640px", 
-  height = "480px",
-  maxWidth = "none"
+  width = "100%", 
+  height = "100%",
+  maxWidth = "100%",
+  topic = ""
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [error, setError] = useState<string>("");
-  const [userName, setUserName] = useState('');
 
   useEffect(() => {
     startStream();
-    const interval = setInterval(() => {
-      captureScreenshot();
-    }, 30000);
-
+    
+    // Clean up function
     return () => {
-      clearInterval(interval);
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
     };
   }, []);
+
+  useEffect(() => {
+    const takeScreenshot = async () => {
+      if (videoRef.current && isVideoOn) {
+        try {
+          console.log("Taking screenshot (every 2 minutes)...");
+          const user = JSON.parse(localStorage.getItem("user") || "{}");
+          if (!user || !user.user_id) {
+            console.warn("Cannot take screenshot: No user ID found");
+            return;
+          }
+
+          // Capture and compress the image
+          const imageData = await captureCompressedImage(videoRef.current, 0.6, 640);
+          console.log(`Screenshot captured, size: ${Math.round(imageData.length/1024)} KB`);
+          
+          // Upload the image
+          console.log(`Uploading screenshot for user ${user.user_id}...`);
+          await uploadScreenshot(imageData, user.user_id, topic || "");
+          console.log("Screenshot upload complete");
+        } catch (error: any) {
+          const errorMessage = error?.message || String(error);
+          console.error("Error processing screenshot:", errorMessage);
+          // Display the error in the UI
+          setError(`Screenshot error: ${errorMessage}`);
+          // Clear error after 8 seconds
+          setTimeout(() => setError(""), 8000);
+        }
+      }
+    };
+    
+    // Only start taking screenshots if video is enabled
+    let screenshotInterval: number | null = null;
+    if (isVideoOn) {
+      console.log("Setting up screenshot interval (120 seconds)");
+      screenshotInterval = window.setInterval(takeScreenshot, 120000); // Every 2 minutes
+      
+      // Don't take an initial screenshot immediately - wait for the first interval
+      // This prevents duplicates at startup
+    }
+    
+    return () => {
+      if (screenshotInterval) {
+        console.log("Clearing screenshot interval");
+        clearInterval(screenshotInterval);
+      }
+    };
+  }, [topic, isVideoOn]);
 
   const startStream = async () => {
     try {
@@ -51,26 +97,6 @@ const Video: React.FC<VideoProps> = ({
     }
   };
 
-  const captureScreenshot = async () => {
-    if (videoRef.current) {
-      const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      const context = canvas.getContext('2d');
-      context?.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-      const screenshot = canvas.toDataURL('image/png');
-
-      storeScreenshotInLocalStorage(screenshot);
-    }
-  };
-
-  const storeScreenshotInLocalStorage = (screenshot: string) => {
-    const existingScreenshots = JSON.parse(localStorage.getItem('screenshots') || '[]');
-    existingScreenshots.push(screenshot);
-    localStorage.setItem('screenshots', JSON.stringify(existingScreenshots));
-    console.log('Screenshot stored in local storage:', screenshot);
-  };
-
   const toggleVideo = async () => {
     if (streamRef.current) {
       const videoTrack = streamRef.current.getVideoTracks()[0];
@@ -78,16 +104,6 @@ const Video: React.FC<VideoProps> = ({
         videoTrack.enabled = !videoTrack.enabled;
         setIsVideoOn(!isVideoOn);
       }
-    }
-  };
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    try {
-      const response = await axios.post('/api/users', { name: userName });
-      console.log(response.data.message);
-    } catch (error) {
-      console.error('Error storing user name:', error);
     }
   };
 
@@ -132,18 +148,6 @@ const Video: React.FC<VideoProps> = ({
           )}
         </button>
       </div>
-
-      {/* <div>
-        <form onSubmit={handleSubmit}>
-          <input 
-            type="text" 
-            value={userName} 
-            onChange={(e) => setUserName(e.target.value)} 
-            placeholder="Enter your name" 
-          />
-          <button type="submit">Submit</button>
-        </form>
-      </div> */}
     </div>
   );
 };

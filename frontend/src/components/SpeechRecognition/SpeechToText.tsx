@@ -226,6 +226,39 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
           window.speechSynthesis.speak(utterance);
         }
       }
+
+      // Store speech in MongoDB
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      console.log("User data for speech storage:", user);
+
+      if (user && user.user_id) {
+        // Use the full URL including the port
+        fetch('http://localhost:8080/api/user/speech', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user_id: user.user_id,
+            text: text,
+            topic: topic
+          }),
+        })
+        .then(response => {
+          if (!response.ok) {
+            return response.text().then(text => {
+              throw new Error(`Server error: ${response.status}, ${text}`);
+            });
+          }
+          return response.json();
+        })
+        .then(data => {
+          console.log("Speech saved successfully:", data);
+        })
+        .catch(error => {
+          console.error('Error saving speech:', error);
+        });
+      }
     } catch (error) {
       console.error('Error communicating with LLM:', error);
       setError('Failed to get response from LLM');

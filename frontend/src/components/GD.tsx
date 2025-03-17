@@ -90,7 +90,7 @@ const GD: React.FC = () => {
           {/* Left Side - Your Video */}
           <div className="w-2/3 h-full mt-16">
             <div className="h-full rounded-2xl overflow-hidden ">
-              <Video width="100%" height="100%" maxWidth="none" />
+              <Video width="100%" height="100%" maxWidth="none" topic={topic} />
             </div>
           </div>
 

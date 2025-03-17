@@ -9,12 +9,17 @@ import json
 import traceback
 from llm1 import llm_bp  # Import the LLM blueprint
 from dotenv import load_dotenv
+from user_data import user_data_bp  # Import the user data blueprint
 
 # Load environment variables from .env file
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend communication
+
+# Import blueprints after app is created to avoid circular imports
+from llm1 import llm_bp
+from user_data import user_data_bp
 
 # MongoDB Setup
 MONGO_URI = os.getenv("MONGO_URI")
@@ -78,8 +83,18 @@ def google_signin():
         traceback.print_exc()  # More detailed error logging
         return jsonify({"success": False, "error": "Authentication failed", "details": str(e)}), 500
 
-# Register the LLM blueprint
+# Register blueprints
 app.register_blueprint(llm_bp)
+app.register_blueprint(user_data_bp)
+
+# Add a route to verify API is working
+@app.route('/api/status', methods=['GET'])
+def api_status():
+    """Check API status."""
+    return jsonify({
+        "status": "online",
+        "registered_blueprints": ["llm1", "user_data"]
+    })
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8080)
