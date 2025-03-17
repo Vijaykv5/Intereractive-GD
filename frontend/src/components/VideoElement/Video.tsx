@@ -3,8 +3,6 @@ import { Video as VideoIcon, VideoOff } from 'lucide-react';
 import axios from 'axios';
 
 
-// qkpv2285;
-
 interface VideoProps {
   width?: string;
   height?: string;

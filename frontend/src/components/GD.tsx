@@ -113,7 +113,7 @@ const GD: React.FC = () => {
 
       {/* Controls at Bottom */}
       <div className="relative z-10">
-        <SpeechToText />
+        <SpeechToText topic={topic} />
       </div>
     </div>
   );

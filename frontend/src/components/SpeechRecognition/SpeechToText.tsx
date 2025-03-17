@@ -1,20 +1,30 @@
-import React, { useState, useEffect, useCallback } from "react";
+// Add these type declarations at the top of the file
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
+}
+
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Mic, MicOff, Save, AlertCircle } from "lucide-react";
-import ChatgptResponse from '../response/ChatgptResponse';
 
 interface SpeechToTextProps {
   sessionId?: string;
   participantId?: string;
+  topic?: string;
 }
 
 const SpeechToText: React.FC<SpeechToTextProps> = ({
   sessionId,
   participantId = "user1", // Default value, should be provided by auth system
+  topic = "",
 }) => {
   const [isListening, setIsListening] = useState(false);
   const [speechText, setSpeechText] = useState<string>("");
   const [recognition, setRecognition] = useState<any>(null);
   const [error, setError] = useState<string>("");
+  const audioRef = useRef<HTMLAudioElement>(null);
   
   // Add a ref to track the actual recognition state
   const recognitionStateRef = React.useRef<boolean>(false);
@@ -38,7 +48,7 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
           setError("");
         };
 
-        recognitionInstance.onresult = (event: any) => {
+        recognitionInstance.onresult = async (event: any) => {
           let finalTranscript = "";
 
           for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -50,6 +60,7 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
 
           if (finalTranscript) {
             setSpeechText((prev) => prev + finalTranscript);
+            await sendToLLM(finalTranscript);
           }
         };
 
@@ -84,7 +95,7 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
         recognitionStateRef.current = false;
       }
     };
-  }, []); // Remove isListening from dependencies
+  }, []);
 
   const toggleListening = useCallback(() => {
     if (!recognition) {
@@ -104,7 +115,7 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
       setIsListening(false);
       recognitionStateRef.current = false;
     }
-  }, [recognition]); // Only depend on recognition
+  }, [recognition]);
 
   const saveTranscriptToBackend = async (text: string) => {
     if (!sessionId) return;
@@ -154,9 +165,76 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
     }
   };
 
+  const sendToLLM = async (text: string) => {
+    try {
+      const response = await fetch('http://localhost:8080/api/llm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          text,
+          topic
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get response from LLM');
+      }
+
+      const data = await response.json();
+      
+      // Get and play the TTS audio
+      if (data.response) {
+        try {
+          // Get audio from the TTS endpoint
+          const audioResponse = await fetch('http://localhost:8080/api/tts', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ text: data.response }),
+          });
+          
+          if (!audioResponse.ok) {
+            throw new Error('Failed to get TTS audio');
+          }
+          
+          // Get the audio blob from the response
+          const audioBlob = await audioResponse.blob();
+          
+          // Create a URL for the audio blob
+          const audioUrl = URL.createObjectURL(audioBlob);
+          
+          // Play the audio
+          if (audioRef.current) {
+            audioRef.current.src = audioUrl;
+            audioRef.current.onended = () => {
+              // Clean up the URL when audio finishes playing
+              URL.revokeObjectURL(audioUrl);
+            };
+            audioRef.current.play();
+          }
+        } catch (ttsError) {
+          console.error('Error with TTS service:', ttsError);
+          
+          // Fallback to browser's speech synthesis if TTS fails
+          const utterance = new SpeechSynthesisUtterance(data.response);
+          utterance.lang = 'en-US';
+          utterance.rate = 1.0;
+          utterance.pitch = 1.0;
+          window.speechSynthesis.speak(utterance);
+        }
+      }
+    } catch (error) {
+      console.error('Error communicating with LLM:', error);
+      setError('Failed to get response from LLM');
+    }
+  };
+
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 shadow-[0_-4px_20px_rgba(0,0,0,0.3)] p-6">
-      <ChatgptResponse userSpeech={speechText} />
+      <audio ref={audioRef} className="hidden" />
       <div className="max-w-4xl mx-auto">
         {error && (
           <div className="mb-4 p-3 bg-red-900/50 border border-red-800 rounded-xl flex items-center space-x-2">

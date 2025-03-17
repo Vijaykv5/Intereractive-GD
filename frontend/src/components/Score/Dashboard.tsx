@@ -30,7 +30,7 @@ export default function Dashboard() {
                 Interactive GD
               </div>
             </div>
-            <nav className="hidden md:flex items-center gap-6">
+            {/* <nav className="hidden md:flex items-center gap-6">
               <a
                 href="#dashboard"
                 className="text-sm text-yellow-500 hover:text-yellow-400 transition-colors"
@@ -49,7 +49,7 @@ export default function Dashboard() {
               >
                 History
               </a>
-            </nav>
+            </nav> */}
             <div className="flex items-center gap-4">
               <div className="absolute top-4 right-4 flex items-center space-x-3">
                 <img
