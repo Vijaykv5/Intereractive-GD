@@ -7,18 +7,28 @@ import os
 from bson import json_util
 import json
 import traceback
+from llm1 import llm_bp  # Import the LLM blueprint
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend communication
 
 # MongoDB Setup
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://musicstories10:Myyt0L8hyxs3cJHN@v1.lb76o.mongodb.net/?retryWrites=true&w=majority&appName=V1")
+MONGO_URI = os.getenv("MONGO_URI")
+if not MONGO_URI:
+    print("WARNING: MONGO_URI environment variable not set")
+
 client = MongoClient(MONGO_URI)
 db = client["gd"]  # Database name
 users_collection = db["users"]  # Collection name
 
-# Google OAuth Client ID (Ensure this matches the one used in your React frontend)
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "236465284909-ef5p23aaadb9c6qlc5e2t75qmtvh96e9.apps.googleusercontent.com")
+# Google OAuth Client ID
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+if not GOOGLE_CLIENT_ID:
+    print("WARNING: GOOGLE_CLIENT_ID environment variable not set")
 
 @app.route("/api/auth/google", methods=["POST"])
 def google_signin():
@@ -67,6 +77,9 @@ def google_signin():
         print(f"Auth error: {e}")
         traceback.print_exc()  # More detailed error logging
         return jsonify({"success": False, "error": "Authentication failed", "details": str(e)}), 500
+
+# Register the LLM blueprint
+app.register_blueprint(llm_bp)
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8080)
