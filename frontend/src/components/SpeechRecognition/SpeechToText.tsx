@@ -29,6 +29,9 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
   // Add a ref to track the actual recognition state
   const recognitionStateRef = React.useRef<boolean>(false);
 
+  // Add a ref to track which LLM endpoint to use
+  const llmEndpointRef = useRef<'llm1' | 'llm2'>('llm1');
+
   useEffect(() => {
     // Initialize speech recognition
     const SpeechRecognition =
@@ -167,7 +170,11 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
 
   const sendToLLM = async (text: string) => {
     try {
-      const response = await fetch('http://localhost:8080/api/llm', {
+      const endpoint = 'llm2';
+      console.log(`Attempting to connect to LLM endpoint: ${endpoint}`);
+      console.log('Request payload:', { text, topic });
+
+      const response = await fetch(`http://localhost:8080/api/${endpoint}/llm`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -178,90 +185,96 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
         }),
       });
 
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse response as JSON:', e);
+        throw new Error(`Invalid JSON response: ${responseText}`);
+      }
+
       if (!response.ok) {
-        throw new Error('Failed to get response from LLM');
+        console.error(`LLM API error response:`, data);
+        throw new Error(`LLM API error: ${response.status} - ${data.error || responseText}`);
       }
-
-      const data = await response.json();
       
-      // Get and play the TTS audio
-      if (data.response) {
-        try {
-          // Get audio from the TTS endpoint
-          const audioResponse = await fetch('http://localhost:8080/api/tts', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ text: data.response }),
-          });
-          
-          if (!audioResponse.ok) {
-            throw new Error('Failed to get TTS audio');
-          }
-          
-          // Get the audio blob from the response
-          const audioBlob = await audioResponse.blob();
-          
-          // Create a URL for the audio blob
-          const audioUrl = URL.createObjectURL(audioBlob);
-          
-          // Play the audio
-          if (audioRef.current) {
-            audioRef.current.src = audioUrl;
-            audioRef.current.onended = () => {
-              // Clean up the URL when audio finishes playing
-              URL.revokeObjectURL(audioUrl);
-            };
-            audioRef.current.play();
-          }
-        } catch (ttsError) {
-          console.error('Error with TTS service:', ttsError);
-          
-          // Fallback to browser's speech synthesis if TTS fails
-          const utterance = new SpeechSynthesisUtterance(data.response);
-          utterance.lang = 'en-US';
-          utterance.rate = 1.0;
-          utterance.pitch = 1.0;
-          window.speechSynthesis.speak(utterance);
-        }
+      if (!data.success) {
+        console.error('LLM API returned unsuccessful response:', data);
+        throw new Error(data.error || 'No response received from LLM');
       }
 
-      // Store speech in MongoDB
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
-      console.log("User data for speech storage:", user);
+      if (!data.response) {
+        console.error('No response in successful data:', data);
+        throw new Error('No response received from LLM');
+      }
 
-      if (user && user.user_id) {
-        // Use the full URL including the port
-        fetch('http://localhost:8080/api/user/speech', {
+      console.log(`Successfully received response from ${endpoint}:`, data.response);
+
+      // Get and play the TTS audio
+      try {
+        console.log(`Requesting TTS from ${endpoint}`);
+        const audioResponse = await fetch(`http://localhost:8080/api/${endpoint}/tts`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            user_id: user.user_id,
-            text: text,
-            topic: topic
-          }),
-        })
-        .then(response => {
-          if (!response.ok) {
-            return response.text().then(text => {
-              throw new Error(`Server error: ${response.status}, ${text}`);
-            });
-          }
-          return response.json();
-        })
-        .then(data => {
-          console.log("Speech saved successfully:", data);
-        })
-        .catch(error => {
-          console.error('Error saving speech:', error);
+          body: JSON.stringify({ text: data.response }),
         });
+        
+        if (!audioResponse.ok) {
+          const errorText = await audioResponse.text();
+          console.error(`TTS API error response: ${errorText}`);
+          throw new Error('Failed to get TTS audio');
+        }
+        
+        const audioBlob = await audioResponse.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        
+        if (audioRef.current) {
+          audioRef.current.src = audioUrl;
+          audioRef.current.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+          };
+          await audioRef.current.play();
+        }
+      } catch (ttsError) {
+        console.error('Error with TTS service:', ttsError);
+        
+        // Fallback to browser's speech synthesis if TTS fails
+        const utterance = new SpeechSynthesisUtterance(data.response);
+        utterance.lang = 'en-US';
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        window.speechSynthesis.speak(utterance);
+      }
+
+      // Store speech in MongoDB
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      if (user && user.user_id) {
+        try {
+          await fetch('http://localhost:8080/api/user/speech', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              user_id: user.user_id,
+              text: text,
+              topic: topic,
+              model_used: data.model_used || endpoint
+            }),
+          });
+        } catch (dbError) {
+          console.error('Error saving to database:', dbError);
+          // Don't throw here as this is not critical
+        }
       }
     } catch (error) {
-      console.error('Error communicating with LLM:', error);
-      setError('Failed to get response from LLM');
+      console.error('Error in sendToLLM:', error);
+      setError(error instanceof Error ? error.message : 'Failed to get response from LLM');
     }
   };
 
