@@ -21,17 +21,30 @@ const topics = [
 const GD: React.FC = () => {
   const [topic, setTopic] = useState<string>("");
   const [timeLeft, setTimeLeft] = useState<number>(1800); // 30 minutes in seconds
+  const [initialTimer, setInitialTimer] = useState<number>(10); // 10 seconds initial timer
+  const [canLLMsStart, setCanLLMsStart] = useState<boolean>(false);
 
   useEffect(() => {
     // Select a random topic on component mount
     setTopic(topics[Math.floor(Math.random() * topics.length)]);
 
-    // Countdown timer logic
+    // Initial 10-second timer
+    const initialTimerInterval = setInterval(() => {
+      setInitialTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(initialTimerInterval);
+          setCanLLMsStart(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // Main countdown timer logic
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          // You might want to handle completion differently
           alert("Time's up!");
           return 0;
         }
@@ -39,7 +52,10 @@ const GD: React.FC = () => {
       });
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      clearInterval(initialTimerInterval);
+    };
   }, []);
 
   const formatTime = (seconds: number) => {
@@ -61,6 +77,14 @@ const GD: React.FC = () => {
             <Clock className="w-5 h-5" />
             <span className="font-semibold">{formatTime(timeLeft)}</span>
           </div>
+
+          {/* Initial Timer */}
+          {!canLLMsStart && (
+            <div className="absolute top-28 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-full flex items-center space-x-2">
+              <Clock className="w-5 h-5" />
+              <span className="font-semibold">Starting in: {initialTimer}s</span>
+            </div>
+          )}
 
           {/* Profile */}
           <div className="absolute top-4 right-4 flex items-center space-x-3">
@@ -113,7 +137,7 @@ const GD: React.FC = () => {
 
       {/* Controls at Bottom */}
       <div className="relative z-10">
-        <SpeechToText topic={topic} />
+        <SpeechToText topic={topic} canLLMsStart={canLLMsStart} />
       </div>
     </div>
   );
