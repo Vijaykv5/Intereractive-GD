@@ -6,6 +6,12 @@ import os
 import requests
 import json
 from openai import OpenAI
+import logging
+import time
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize a Blueprint for LLM routes
 llm_bp = Blueprint('llm2', __name__)
@@ -14,162 +20,254 @@ CORS(llm_bp, resources={r"/*": {"origins": "*"}})  # Enable CORS for frontend co
 # Get OpenRouter API key from environment variables
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 if not OPENROUTER_API_KEY:
-    print("WARNING: OPENROUTER_API_KEY environment variable not set")
-else:
-    print(f"Using OpenRouter API key: {OPENROUTER_API_KEY[:8]}...")  # Print first 8 chars for debugging
+    logger.error("OPENROUTER_API_KEY environment variable not set")
+    raise ValueError("OPENROUTER_API_KEY environment variable is required")
 
 # Initialize OpenAI client with OpenRouter base URL
-client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=OPENROUTER_API_KEY,
-)
+try:
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=OPENROUTER_API_KEY,
+        default_headers={
+            "HTTP-Referer": "http://localhost:5173",
+            "X-Title": "Interactive-GD"
+        }
+    )
+    logger.info("Successfully configured OpenRouter API")
+except Exception as e:
+    logger.error(f"Failed to configure OpenRouter API: {e}")
+    raise
 
-# Global variable to track if this LLM should respond
-should_respond = False
-
-def chat_with_llm1(text, topic):
-    """Send message to LLM1 and get response"""
-    try:
-        response = requests.post(
-            'http://localhost:8080/api/llm1/llm',
-            json={"text": text, "topic": topic, "is_user_message": False}
-        )
-        if response.ok:
-            return response.json()
-        return None
-    except Exception as e:
-        print(f"Error communicating with LLM1: {e}")
-        return None
+# Global variables to track conversation state
+is_user_speaking = False
+last_message = None
+last_topic = None
+is_ai_speaking = False
+conversation_started = False
+current_speaker = None  # Track which LLM is currently speaking
 
 @llm_bp.route('/api/llm2/llm', methods=['POST'])
 def get_llm_response():
-    global should_respond
+    global is_user_speaking, last_message, last_topic, is_ai_speaking, conversation_started, current_speaker
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "No JSON data provided"}), 400
+
         text = data.get("text")
-        topic = data.get("topic")
+        topic = data.get("topic", "")
         is_user_message = data.get("is_user_message", True)
+        user_interrupted = data.get("user_interrupted", False)
+        is_initial_message = data.get("is_initial_message", False)
+        from_llm1 = data.get("from_llm1", False)
+        conversation_history = data.get("conversation_history", [])
 
         if not text:
             return jsonify({"success": False, "error": "No text provided"}), 400
 
-        if not OPENROUTER_API_KEY:
-            return jsonify({
-                "success": False, 
-                "error": "OpenRouter API key not configured. Please check your environment variables."
-            }), 500
+        logger.info(f"Received request - Topic: {topic}, Is initial: {is_initial_message}, Is user message: {is_user_message}, From LLM1: {from_llm1}")
 
-        # If this is a user message and it's not our turn, forward to LLM1
-        if is_user_message and not should_respond:
-            llm1_response = chat_with_llm1(text, topic)
-            if llm1_response and llm1_response.get("success"):
-                should_respond = True  # It will be our turn next
-                return jsonify(llm1_response)
-            return jsonify({"success": False, "error": "Failed to get response from LLM1"}), 500
+        # Handle user interruption
+        if user_interrupted:
+            is_user_speaking = True
+            is_ai_speaking = False
+            current_speaker = None
+            last_message = text
+            last_topic = topic
+            return jsonify({"success": True, "response": "User is speaking, waiting for their turn to finish."})
 
-        # If it's not our turn and it's not a user message, ignore
-        if not should_respond and not is_user_message:
-            return jsonify({"success": False, "error": "Not LLM2's turn"}), 400
-
-        prompt = f"""
-        You are a participant in a group discussion about "{topic}". Respond to the following message in a 
-        brief way (maximum 60 words). Sometimes agree with the speaker, you can also disagree, but also share your own insights and 
-        perspectives. Be natural and conversational, like a real participant in a group discussion.
-        
-        Current topic: {topic}
-        User says: {text}
-        """
-        
-        try:
-            completion = client.chat.completions.create(
-                extra_headers={
-                    "HTTP-Referer": "http://localhost:5173",
-                    "X-Title": "Interactive-GD"
-                },
-                model="meta-llama/llama-3.2-3b-instruct:free",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                temperature=0.7,
-                max_tokens=100
-            )
+        # Create appropriate prompt based on context
+        if is_initial_message and not conversation_started:
+            conversation_started = True
+            is_ai_speaking = True
+            current_speaker = "llm2"
+            prompt = f"""
+            You are starting a group discussion about "{topic}". Begin the discussion with a brief introduction 
+            (maximum 40 words) that sets the context and invites others to share their perspectives. Be engaging 
+            and natural, like a real discussion moderator.
             
-            llm_reply = completion.choices[0].message.content
-            print("Successfully received response from Llama")
+            Topic: {topic}
+            """
+        elif from_llm1:
+            is_ai_speaking = True
+            current_speaker = "llm2"
+            # Create a context-aware prompt using conversation history
+            history_context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in conversation_history[-3:]])
+            prompt = f"""
+            You are a participant in a group discussion about "{topic}". Respond to the following message in a 
+            brief way (maximum 40 words). Consider the recent conversation context and provide a fresh perspective.
+            Be natural and conversational, like a real participant in a group discussion.
+            
+            Recent conversation:
+            {history_context}
+            
+            Current topic: {topic}
+            Previous speaker says: {text}
+            """
+        elif is_user_message:
+            is_user_speaking = False
+            is_ai_speaking = True
+            current_speaker = "llm2"
+            # Create a context-aware prompt using conversation history
+            history_context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in conversation_history[-3:]])
+            prompt = f"""
+            You are a participant in a group discussion about "{topic}". Respond to the following message in a 
+            brief way (maximum 40 words). Consider the recent conversation context and provide a fresh perspective.
+            Be natural and conversational, like a real participant in a group discussion.
+            
+            Recent conversation:
+            {history_context}
+            
+            Current topic: {topic}
+            User says: {text}
+            """
+        else:
+            # Handle the case where none of the above conditions are met
+            # This could be a continuation of the conversation
+            is_ai_speaking = True
+            current_speaker = "llm2"
+            history_context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in conversation_history[-3:]])
+            prompt = f"""
+            You are a participant in a group discussion about "{topic}". Continue the discussion in a 
+            brief way (maximum 40 words). Consider the recent conversation context and provide a fresh perspective.
+            Be natural and conversational, like a real participant in a group discussion.
+            
+            Recent conversation:
+            {history_context}
+            
+            Current topic: {topic}
+            Continue the discussion about: {text}
+            """
+
+        try:
+            # Add retry logic for API calls
+            max_retries = 3
+            retry_count = 0
+            last_error = None
+
+            while retry_count < max_retries:
+                try:
+                    completion = client.chat.completions.create(
+                        model="meta-llama/llama-3.2-3b-instruct:free",
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "You are a participant in a group discussion. Provide brief, natural responses that build on the conversation without repeating previous points."
+                            },
+                            *[{"role": msg["role"], "content": msg["content"]} for msg in conversation_history[-5:]],
+                            {
+                                "role": "user",
+                                "content": prompt
+                            }
+                        ],
+                        temperature=0.7,
+                        max_tokens=100
+                    )
+                    
+                    llm_reply = completion.choices[0].message.content.strip()
+                    
+                    # Ensure the response is not too long
+                    words = llm_reply.split()
+                    if len(words) > 55:
+                        llm_reply = ' '.join(words[:50]) + '...'
+                    
+                    logger.info(f"Generated response: {llm_reply[:50]}...")
+                    
+                    # Send response back to LLM1
+                    try:
+                        response = requests.post(
+                            'http://localhost:5000/api/llm1/llm',
+                            json={
+                                "text": llm_reply,
+                                "topic": topic,
+                                "is_user_message": False,
+                                "is_initial_message": False,
+                                "from_llm2": True,
+                                "conversation_history": conversation_history + [{"role": "assistant", "content": llm_reply}]
+                            }
+                        )
+                        logger.info(f"LLM1 response status: {response.status_code}")
+                    except Exception as e:
+                        logger.error(f"Error sending response to LLM1: {e}")
+                    
+                    # Return the response
+                    return jsonify({
+                        "success": True, 
+                        "response": llm_reply,
+                        "model_used": "llama-3.2-3b"
+                    })
+                    
+                except Exception as e:
+                    last_error = e
+                    retry_count += 1
+                    logger.warning(f"Attempt {retry_count} failed: {str(e)}")
+                    if retry_count < max_retries:
+                        time.sleep(1)  # Wait before retrying
+                    continue
+
+            # If we get here, all retries failed
+            logger.error(f"All {max_retries} attempts failed. Last error: {str(last_error)}")
+            is_ai_speaking = False
+            current_speaker = None
+            return jsonify({"success": False, "error": f"Failed to generate response after {max_retries} attempts"}), 500
             
         except Exception as e:
-            print(f"Error calling OpenRouter API: {str(e)}")
-            return jsonify({
-                "success": False,
-                "error": f"Failed to get response from LLM: {str(e)}"
-            }), 500
-        
-        # Ensure the response is not too long
-        words = llm_reply.split()
-        if len(words) > 55:
-            llm_reply = ' '.join(words[:50]) + '...'
-        
-        # Mark that it's not our turn next
-        should_respond = False
-        
-        return jsonify({
-            "success": True, 
-            "response": llm_reply,
-            "model_used": "llama-3.2-3b"
-        })
+            logger.error(f"Error generating content with Llama: {e}")
+            is_ai_speaking = False
+            current_speaker = None
+            return jsonify({"success": False, "error": f"Failed to generate response: {str(e)}"}), 500
 
     except Exception as e:
-        import traceback
-        traceback_str = traceback.format_exc()
-        print(f"Error in LLM processing: {e}")
-        print(f"Traceback: {traceback_str}")
-        return jsonify({
-            "success": False, 
-            "error": f"Failed to get response from LLM: {str(e)}"
-        }), 500
+        logger.error(f"Error in LLM processing: {e}")
+        is_ai_speaking = False
+        current_speaker = None
+        return jsonify({"success": False, "error": f"Failed to get response from LLM: {str(e)}"}), 500
+
+@llm_bp.route('/api/llm2/user_finished', methods=['POST'])
+def user_finished_speaking():
+    """Handle when user finishes speaking"""
+    global is_user_speaking, last_message, last_topic, is_ai_speaking
+    try:
+        is_user_speaking = False
+        is_ai_speaking = False
+        if last_message and last_topic:
+            # Continue the conversation with the last user message
+            return get_llm_response()
+        return jsonify({"success": True, "response": "Conversation resumed."})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @llm_bp.route('/api/llm2/tts', methods=['POST'])
 def text_to_speech():
-    """Converts text to speech using pyttsx3 with a deep male voice."""
+    """Converts text to speech using gTTS with a deep male voice."""
     try:
-        import pyttsx3
-        import tempfile
-        import os
-        
         data = request.get_json()
         text = data.get("text")
 
         if not text:
             return jsonify({"success": False, "error": "No text provided"}), 400
 
-        # Initialize the pyttsx3 engine
-        engine = pyttsx3.init()
+        # Add some light formatting to make the speech more expressive
+        formatted_text = text.replace("!", "! ").replace("?", "? ")
         
-        # Get available voices
-        voices = engine.getProperty('voices')
+        # Using British English for a deeper male voice
+        tts = gTTS(
+            text=formatted_text, 
+            lang='en',
+            tld='co.uk',  # British English - deeper male voice
+            slow=False     # Normal speed
+        )
         
-        # Select a male voice (usually the first voice is male)
-        engine.setProperty('voice', voices[0].id)
+        # Save the audio to a byte stream
+        audio_stream = io.BytesIO()
+        tts.write_to_fp(audio_stream)
+        audio_stream.seek(0)
         
-        # Set a lower pitch for a deeper voice
-        engine.setProperty('rate', 150)  # Speed
-        engine.setProperty('volume', 0.9)  # Volume
+        # Log success
+        logger.info(f"Successfully generated speech for text: {text[:30]}...")
         
-        # Create a temporary file
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
-        temp_filename = temp_file.name
-        temp_file.close()
-        
-        # Save to the temporary file
-        engine.save_to_file(text, temp_filename)
-        engine.runAndWait()
-        
-        # Return the file
-        return send_file(temp_filename, mimetype="audio/mp3")
-        
+        return send_file(audio_stream, mimetype="audio/mp3")
+    
     except Exception as e:
-        print(f"Error in pyttsx3 conversion: {e}")
+        logger.error(f"Error in gTTS conversion: {e}")
         return jsonify({"success": False, "error": f"Text-to-speech conversion failed: {str(e)}"}), 500

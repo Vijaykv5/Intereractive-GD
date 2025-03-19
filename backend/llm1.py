@@ -1,138 +1,104 @@
 from flask import Blueprint, request, jsonify, send_file
 from flask_cors import CORS
-import google.generativeai as genai
+from openai import OpenAI
 import io
 from gtts import gTTS
 import os
 import requests
+import logging
+from dotenv import load_dotenv
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize a Blueprint for LLM routes
 llm_bp = Blueprint('llm1', __name__)
 CORS(llm_bp, resources={r"/*": {"origins": "*"}})  # Enable CORS for frontend communication
 
-# Get Gemini API key from environment variables
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-else:
-    print("WARNING: GEMINI_API_KEY environment variable not set")
-
-# Global variable to track if this LLM should respond
-should_respond = True
-
-def chat_with_llm2(text, topic):
-    """Send message to LLM2 and get response"""
+def init_api_keys():
     try:
-        response = requests.post(
-            'http://localhost:8080/api/llm2/llm',
-            json={"text": text, "topic": topic}
+        load_dotenv()
+        api_key = os.getenv("OPENROUTER_API_KEY")
+        if not api_key:
+            raise ValueError("OPENROUTER_API_KEY environment variable is required")
+        
+        # Initialize OpenAI client with OpenRouter
+        global client
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
         )
-        if response.ok:
-            return response.json()
-        return None
+        logger.info("Successfully configured OpenRouter API")
     except Exception as e:
-        print(f"Error communicating with LLM2: {e}")
-        return None
+        logger.error(f"Error in initializing API keys: {e}")
+        raise
+
+# Initialize API keys when the blueprint is created
+init_api_keys()
 
 @llm_bp.route('/api/llm1/llm', methods=['POST'])
 def get_llm_response():
-    global should_respond
     try:
         data = request.get_json()
-        text = data.get("text")
-        topic = data.get("topic", "")
-        is_user_message = data.get("is_user_message", True)
-
-        if not text:
+        if not data or not data.get("text"):
             return jsonify({"success": False, "error": "No text provided"}), 400
 
-        # If this is a user message and it's not our turn, forward to LLM2
-        if is_user_message and not should_respond:
-            llm2_response = chat_with_llm2(text, topic)
-            if llm2_response and llm2_response.get("success"):
-                should_respond = True  # It will be our turn next
-                return jsonify(llm2_response)
-            return jsonify({"success": False, "error": "Failed to get response from LLM2"}), 500
+        text = data.get("text")
+        topic = data.get("topic", "")
+        is_initial = data.get("is_initial_message", False)
 
-        # If it's not our turn and it's not a user message, ignore
-        if not should_respond and not is_user_message:
-            return jsonify({"success": False, "error": "Not LLM1's turn"}), 400
+        if is_initial:
+            prompt = f"""Start a group discussion about "{topic}". Give a brief introduction (max 40 words) that sets the context and invites others to share their views."""
+        else:
+            prompt = f"""You are in a group discussion about "{topic}". Respond briefly (max 40 words) to: {text}"""
 
-        # Initialize the model
-        model = genai.GenerativeModel('gemini-1.5-pro-latest')
-        
-        # Create a prompt that makes the model a discussion participant
-        prompt = f"""
-        You are a participant in a group discussion about "{topic}". Respond to the following message in a 
-        brief way (maximum 40 words). Sometimes agree with the speaker, but also share your own insights and 
-        perspectives. Be natural and conversational, like a real participant in a group discussion.
-        
-        Current topic: {topic}
-        User says: {text}
-        """
-        
-        # Generate content
-        response = model.generate_content(prompt)
-        
-        # Extract the response text
-        llm_reply = response.text
-        
-        # Ensure the response is not too long
-        words = llm_reply.split()
-        if len(words) > 55:
-            llm_reply = ' '.join(words[:50]) + '...'
-        
-        # Mark that it's not our turn next
-        should_respond = False
-        
+        completion = client.chat.completions.create(
+            extra_headers={
+                "HTTP-Referer": "http://localhost:8080",  # Your site URL
+                "X-Title": "Interactive GD",  # Your site name
+            },
+            model="google/gemini-2.0-flash-lite-preview-02-05:free",
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        )
+
+        response_text = completion.choices[0].message.content.strip()
+        if len(response_text.split()) > 55:
+            response_text = ' '.join(response_text.split()[:50]) + '...'
+
         return jsonify({
-            "success": True, 
-            "response": llm_reply,
-            "model_used": "gemini-1.5-pro"
+            "success": True,
+            "response": response_text,
+            "model_used": "google/gemini-2.0-flash-lite-preview-02-05:free"
         })
 
     except Exception as e:
-        import traceback
-        traceback_str = traceback.format_exc()
-        print(f"Error in LLM processing: {e}")
-        print(f"Traceback: {traceback_str}")
-        return jsonify({"success": False, "error": f"Failed to get response from LLM: {str(e)}"}), 500
+        logger.error(f"Error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @llm_bp.route('/api/llm1/tts', methods=['POST'])
 def text_to_speech():
-    """Converts text to speech using gTTS with an enhanced sweet female voice."""
     try:
         data = request.get_json()
-        text = data.get("text")
-
-        if not text:
+        if not data or not data.get("text"):
             return jsonify({"success": False, "error": "No text provided"}), 400
 
-        # Add some light formatting to make the speech more expressive
-        formatted_text = text.replace("!", "! ").replace("?", "? ")
+        text = data.get("text")
+        tts = gTTS(text=text, lang='en', tld='com.au')
         
-        # Using Australian English (tends to have a sweeter female voice in gTTS)
-        # The 'com.au' TLD provides a different voice than standard US English
-        tts = gTTS(
-            text=formatted_text, 
-            lang='en',
-            tld='com.au',  # Australian English - softer female voice
-            slow=False     # Normal speed
-        )
-        
-        # Save the audio to a byte stream
         audio_stream = io.BytesIO()
         tts.write_to_fp(audio_stream)
         audio_stream.seek(0)
         
-        # Log success
-        print(f"Successfully generated speech for text: {text[:30]}...")
-        
         return send_file(audio_stream, mimetype="audio/mp3")
     
     except Exception as e:
-        print(f"Error in gTTS conversion: {e}")
-        return jsonify({"success": False, "error": f"Text-to-speech conversion failed: {str(e)}"}), 500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 # This is an alternative implementation if you want to try another option
 @llm_bp.route('/api/tts/alt', methods=['POST'])
