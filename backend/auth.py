@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Blueprint, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
 from google.oauth2 import id_token
@@ -7,19 +7,14 @@ import os
 from bson import json_util
 import json
 import traceback
-from llm1 import llm_bp  # Import the LLM blueprint
 from dotenv import load_dotenv
-from user_data import user_data_bp  # Import the user data blueprint
 
 # Load environment variables from .env file
 load_dotenv()
 
-app = Flask(__name__)
-CORS(app)  # Enable CORS for frontend communication
-
-# Import blueprints after app is created to avoid circular imports
-from llm1 import llm_bp
-from user_data import user_data_bp
+# Create blueprint instead of Flask app
+auth_bp = Blueprint('auth', __name__)
+CORS(auth_bp, resources={r"/*": {"origins": "*"}})  # Enable CORS for frontend communication
 
 # MongoDB Setup
 MONGO_URI = os.getenv("MONGO_URI")
@@ -35,7 +30,7 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 if not GOOGLE_CLIENT_ID:
     print("WARNING: GOOGLE_CLIENT_ID environment variable not set")
 
-@app.route("/api/auth/google", methods=["POST"])
+@auth_bp.route("/api/auth/google", methods=["POST"])
 def google_signin():
     try:
         data = request.get_json()
@@ -83,18 +78,14 @@ def google_signin():
         traceback.print_exc()  # More detailed error logging
         return jsonify({"success": False, "error": "Authentication failed", "details": str(e)}), 500
 
-# Register blueprints
-app.register_blueprint(llm_bp)
-app.register_blueprint(user_data_bp)
-
 # Add a route to verify API is working
-@app.route('/api/status', methods=['GET'])
+@auth_bp.route('/api/status', methods=['GET'])
 def api_status():
     """Check API status."""
     return jsonify({
         "status": "online",
-        "registered_blueprints": ["llm1", "user_data"]
+        "registered_blueprints": ["auth"]
     })
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=8080)
+    auth_bp.run(debug=True, host="0.0.0.0", port=8080)

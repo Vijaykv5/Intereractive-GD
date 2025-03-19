@@ -1,11 +1,14 @@
 from flask import Blueprint, request, jsonify, send_file
+from flask_cors import CORS
 import google.generativeai as genai
 import io
 from gtts import gTTS
 import os
+import requests
 
 # Initialize a Blueprint for LLM routes
 llm_bp = Blueprint('llm1', __name__)
+CORS(llm_bp, resources={r"/*": {"origins": "*"}})  # Enable CORS for frontend communication
 
 # Get Gemini API key from environment variables
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
@@ -14,15 +17,46 @@ if GEMINI_API_KEY:
 else:
     print("WARNING: GEMINI_API_KEY environment variable not set")
 
-@llm_bp.route('/api/llm', methods=['POST'])
+# Global variable to track if this LLM should respond
+should_respond = True
+
+def chat_with_llm2(text, topic):
+    """Send message to LLM2 and get response"""
+    try:
+        response = requests.post(
+            'http://localhost:8080/api/llm2/llm',
+            json={"text": text, "topic": topic}
+        )
+        if response.ok:
+            return response.json()
+        return None
+    except Exception as e:
+        print(f"Error communicating with LLM2: {e}")
+        return None
+
+@llm_bp.route('/api/llm1/llm', methods=['POST'])
 def get_llm_response():
+    global should_respond
     try:
         data = request.get_json()
         text = data.get("text")
-        topic = data.get("topic", "")  # Get the topic if provided
+        topic = data.get("topic", "")
+        is_user_message = data.get("is_user_message", True)
 
         if not text:
             return jsonify({"success": False, "error": "No text provided"}), 400
+
+        # If this is a user message and it's not our turn, forward to LLM2
+        if is_user_message and not should_respond:
+            llm2_response = chat_with_llm2(text, topic)
+            if llm2_response and llm2_response.get("success"):
+                should_respond = True  # It will be our turn next
+                return jsonify(llm2_response)
+            return jsonify({"success": False, "error": "Failed to get response from LLM2"}), 500
+
+        # If it's not our turn and it's not a user message, ignore
+        if not should_respond and not is_user_message:
+            return jsonify({"success": False, "error": "Not LLM1's turn"}), 400
 
         # Initialize the model
         model = genai.GenerativeModel('gemini-1.5-pro-latest')
@@ -37,26 +71,24 @@ def get_llm_response():
         User says: {text}
         """
         
-        # Debug print
-        print(f"Sending prompt to Gemini: {prompt[:100]}...")
-        
         # Generate content
         response = model.generate_content(prompt)
-        
-        # Debug print
-        print("Received response from Gemini")
         
         # Extract the response text
         llm_reply = response.text
         
-        # Ensure the response is not too long (approximately 50 words)
+        # Ensure the response is not too long
         words = llm_reply.split()
-        if len(words) > 55:  # Allow a small buffer
+        if len(words) > 55:
             llm_reply = ' '.join(words[:50]) + '...'
+        
+        # Mark that it's not our turn next
+        should_respond = False
         
         return jsonify({
             "success": True, 
-            "response": llm_reply
+            "response": llm_reply,
+            "model_used": "gemini-1.5-pro"
         })
 
     except Exception as e:
@@ -66,7 +98,7 @@ def get_llm_response():
         print(f"Traceback: {traceback_str}")
         return jsonify({"success": False, "error": f"Failed to get response from LLM: {str(e)}"}), 500
 
-@llm_bp.route('/api/tts', methods=['POST'])
+@llm_bp.route('/api/llm1/tts', methods=['POST'])
 def text_to_speech():
     """Converts text to speech using gTTS with an enhanced sweet female voice."""
     try:
