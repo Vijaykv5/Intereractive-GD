@@ -407,6 +407,12 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
 
   const handleHandRaise = async () => {
     if (!isHandRaised) {
+      // Only allow raising hand if AI is not speaking
+      if (isAISpeaking) {
+        setError("Please wait for the AI to finish speaking");
+        return;
+      }
+
       // Raise hand and stop any ongoing AI speech
       setIsHandRaised(true);
       setIsAISpeaking(false);
@@ -483,6 +489,8 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
             className={`p-4 rounded-full transition-all transform hover:scale-105 active:scale-95 shadow-lg ${
               isHandRaised
                 ? "bg-green-600 hover:bg-green-700"
+                : isAISpeaking
+                ? "bg-gray-700 cursor-not-allowed"
                 : "bg-gray-700 hover:bg-gray-600"
             }`}
             disabled={!canLLMsStart || isAISpeaking}

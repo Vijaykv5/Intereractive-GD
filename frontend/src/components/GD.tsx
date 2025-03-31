@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import SpeechToText from "./SpeechRecognition/SpeechToText";
 import { Clock, VideoOff } from "lucide-react";
 import Video from "./VideoElement/Video";
-
+import participant1 from '../assets/participant1.png';
+import participant2 from '../assets/participant2.png';
 const topics = [
   "Impact of Artificial Intelligence on Job Markets",
   "Cryptocurrencies: Future of Finance or Bubble?",
@@ -82,7 +83,9 @@ const GD: React.FC = () => {
           {!canLLMsStart && (
             <div className="absolute top-28 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-full flex items-center space-x-2">
               <Clock className="w-5 h-5" />
-              <span className="font-semibold">Starting in: {initialTimer}s</span>
+              <span className="font-semibold">
+                Starting in: {initialTimer}s
+              </span>
             </div>
           )}
 
@@ -119,7 +122,8 @@ const GD: React.FC = () => {
           </div>
 
           {/* Right Side - Other Participants */}
-          <div className="w-1/3 flex flex-col justify-center space-y-4 py-8">
+          {/* <div className="w-1/3 flex flex-col justify-center space-y-4 py-8">
+
             {[1, 2].map((index) => (
               <div
                 key={index}
@@ -131,6 +135,29 @@ const GD: React.FC = () => {
                 <VideoOff className="w-8 h-8 text-gray-600" />
               </div>
             ))}
+          </div>  */}
+
+          <div className="w-1/3 flex flex-col justify-center space-y-4 py-8">
+            <div className="h-[45%] bg-gray-900/50 rounded-2xl overflow-hidden border border-gray-800 flex items-center justify-center relative">
+              <div className="absolute top-3 left-3 bg-black/50 px-3 py-1 rounded-full">
+                <p className="text-white text-sm">Participant 1</p>
+              </div>
+              <img
+                src={participant1}
+                alt="Participant 1"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="h-[45%] bg-gray-900/50 rounded-2xl overflow-hidden border border-gray-800 flex items-center justify-center relative">
+              <div className="absolute top-3 left-3 bg-black/50 px-3 py-1 rounded-full">
+                <p className="text-white text-sm">Participant 2</p>
+              </div>
+              <img
+                src={participant2}
+                alt="Participant 2"
+                className="w-full h-full object-cover"
+              />
+            </div>
           </div>
         </div>
       </div>

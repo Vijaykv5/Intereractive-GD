@@ -47,18 +47,21 @@ def get_llm_response():
         text = data.get("text")
         topic = data.get("topic", "")
         is_initial = data.get("is_initial_message", False)
+        is_user_message = data.get("is_user_message", False)
 
         if is_initial:
-            prompt = f"""Start a group discussion about "{topic}". Give a brief introduction (max 40 words) that sets the context and invites others to share their views."""
+            prompt = f"""You are starting a group discussion about "{topic}". Give a simple introduction in 40-50 words that sets the context and invites others to share their views. Use plain text without any special characters or emojis."""
+        elif is_user_message:
+            prompt = f"""You are in a group discussion about "{topic}". A participant just said: "{text}". Respond directly to their point in 40-50 words. Use plain text without any special characters or emojis. Keep your response simple and conversational."""
         else:
-            prompt = f"""You are in a group discussion about "{topic}". Respond briefly (max 40 words) to: {text}"""
+            prompt = f"""You are in a group discussion about "{topic}". Respond in 40-50 words to: {text}. Use plain text without any special characters or emojis. Keep your response simple and conversational."""
 
         completion = client.chat.completions.create(
             extra_headers={
                 "HTTP-Referer": "http://localhost:8080",  # Your site URL
                 "X-Title": "Interactive GD",  # Your site name
             },
-            model="google/gemini-2.0-flash-lite-preview-02-05:free",
+            model="google/gemini-pro",
             messages=[
                 {
                     "role": "user",
@@ -74,7 +77,7 @@ def get_llm_response():
         return jsonify({
             "success": True,
             "response": response_text,
-            "model_used": "google/gemini-2.0-flash-lite-preview-02-05:free"
+            "model_used": "google/gemini-pro"
         })
 
     except Exception as e:
