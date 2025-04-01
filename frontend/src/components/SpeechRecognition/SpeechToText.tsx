@@ -65,14 +65,6 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
         try {
           // Send initial message to start the discussion
           await sendToLLM("Let's begin the discussion about " + topic);
-          
-          // If no user speaks within 10 seconds, continue the conversation
-          setTimeout(async () => {
-            if (!isHandRaised && !isListening) {
-              console.log("No user response, continuing LLM conversation");
-              await sendToLLM("Please continue the discussion about " + topic);
-            }
-          }, 10000);
         } catch (error) {
           console.error('Error starting conversation:', error);
           setError('Failed to start the conversation');
@@ -113,17 +105,6 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
 
           if (finalTranscript) {
             setSpeechText((prev) => prev + finalTranscript);
-            
-            // If user is speaking (hand is raised), send their speech to LLM
-            if (isHandRaised) {
-              console.log("User spoke:", finalTranscript);
-              // Stop listening after getting user's speech
-              if (recognition && recognitionStateRef.current) {
-                recognition.stop();
-              }
-              // Send user's speech to LLM1
-              await sendToLLM(finalTranscript);
-            }
           }
         };
 
@@ -228,8 +209,94 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
     }
   };
 
+  const handleHandRaise = async () => {
+    if (!isHandRaised) {
+      // Only allow raising hand if AI is not speaking
+      if (isAISpeaking) {
+        setError("Please wait for the AI to finish speaking");
+        return;
+      }
+
+      // Raise hand and stop any ongoing AI speech
+      setIsHandRaised(true);
+      setIsAISpeaking(false);
+      setSpeechText(""); // Clear any previous speech
+      
+      // Clear any pending AI timeouts
+      if (aiSpeakingTimeoutRef.current) {
+        clearTimeout(aiSpeakingTimeoutRef.current);
+        aiSpeakingTimeoutRef.current = null;
+      }
+      
+      // Stop any ongoing AI speech
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      
+      // Stop browser speech synthesis if active
+      window.speechSynthesis.cancel();
+      
+      // Start listening immediately when hand is raised
+      if (recognition && !recognitionStateRef.current) {
+        recognition.start();
+      }
+    } else {
+      // Lower hand and stop listening
+      setIsHandRaised(false);
+      if (recognition && recognitionStateRef.current) {
+        recognition.stop();
+      }
+      
+      // Store the complete speech in MongoDB
+      if (speechText.trim()) {
+        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        if (user && user.user_id) {
+          try {
+            const response = await fetch('http://localhost:8080/api/user/speech', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                user_id: user.user_id,
+                text: speechText.trim(),
+                topic: topic
+              }),
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              console.error('Error saving to database:', errorData);
+              setError('Failed to save speech to database');
+            } else {
+              console.log('Successfully saved speech to database');
+            }
+          } catch (dbError) {
+            console.error('Error saving to database:', dbError);
+            setError('Failed to save speech to database');
+          }
+        }
+
+        // Send the accumulated speech to LLM
+        await sendToLLM(speechText);
+        // Clear the speech text for next turn
+        setSpeechText("");
+      }
+      
+      // Switch LLM for next response
+      llmEndpointRef.current = llmEndpointRef.current === 'llm1' ? 'llm2' : 'llm1';
+    }
+  };
+
   const sendToLLM = async (text: string) => {
     try {
+      // If user has raised hand or is currently speaking, don't allow LLM to speak
+      if (isHandRaised || isListening || recognitionStateRef.current) {
+        console.log('User has the floor, preventing LLM response');
+        return;
+      }
+
       const endpoint = llmEndpointRef.current;
       console.log(`Attempting to connect to LLM endpoint: ${endpoint}`);
       
@@ -416,27 +483,6 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
         setIsAISpeaking(true);
         window.speechSynthesis.speak(utterance);
       }
-
-      // Store speech in MongoDB
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
-      if (user && user.user_id) {
-        try {
-          await fetch('http://localhost:8080/api/user/speech', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              user_id: user.user_id,
-              text: text,
-              topic: topic,
-              model_used: data.model_used || endpoint
-            }),
-          });
-        } catch (dbError) {
-          console.error('Error saving to database:', dbError);
-        }
-      }
     } catch (error) {
       console.error('Error in sendToLLM:', error);
       setError(error instanceof Error ? error.message : 'Failed to get response from LLM');
@@ -446,64 +492,6 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
         type: 'participant_stopped_speaking',
         participantId: currentParticipant
       }, '*');
-    }
-  };
-
-  const handleHandRaise = async () => {
-    if (!isHandRaised) {
-      // Only allow raising hand if AI is not speaking
-      if (isAISpeaking) {
-        setError("Please wait for the AI to finish speaking");
-        return;
-      }
-
-      // Raise hand and stop any ongoing AI speech
-      setIsHandRaised(true);
-      setIsAISpeaking(false);
-      
-      // Clear any pending AI timeouts
-      if (aiSpeakingTimeoutRef.current) {
-        clearTimeout(aiSpeakingTimeoutRef.current);
-        aiSpeakingTimeoutRef.current = null;
-      }
-      
-      // Stop any ongoing AI speech
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-      }
-      
-      // Stop browser speech synthesis if active
-      window.speechSynthesis.cancel();
-      
-      try {
-        // Notify LLM2 about user interruption
-        await fetch('http://localhost:8080/api/llm2/llm', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            text: "User raised hand",
-            topic: topic,
-            user_interrupted: true
-          }),
-        });
-        
-        // Start listening when hand is raised
-        if (recognition && !recognitionStateRef.current) {
-          recognition.start();
-        }
-      } catch (error) {
-        console.error('Error raising hand:', error);
-        setError('Failed to raise hand');
-      }
-    } else {
-      // Lower hand and stop listening
-      setIsHandRaised(false);
-      if (recognition && recognitionStateRef.current) {
-        recognition.stop();
-      }
     }
   };
 

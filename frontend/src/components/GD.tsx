@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import SpeechToText from "./SpeechRecognition/SpeechToText";
+import GDEvaluation from "./Score/GDEvaluation";
 import { Clock, VideoOff } from "lucide-react";
 import Video from "./VideoElement/Video";
 import AnimatedParticipant from "./AnimatedParticipant";
@@ -27,8 +28,16 @@ const GD: React.FC = () => {
   const [canLLMsStart, setCanLLMsStart] = useState<boolean>(false);
   const [speakingParticipant, setSpeakingParticipant] = useState<number | null>(null);
   const [participantAudio, setParticipantAudio] = useState<{ [key: number]: string }>({});
+  const [showEvaluation, setShowEvaluation] = useState<boolean>(false);
+  const [userId, setUserId] = useState<string>("");
 
   useEffect(() => {
+    // Get user ID from localStorage
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    if (user && user.user_id) {
+      setUserId(user.user_id);
+    }
+
     // Select a random topic on component mount
     setTopic(topics[Math.floor(Math.random() * topics.length)]);
 
@@ -49,7 +58,7 @@ const GD: React.FC = () => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          alert("Time's up!");
+          setShowEvaluation(true);
           return 0;
         }
         return prev - 1;
@@ -85,6 +94,23 @@ const GD: React.FC = () => {
     const secs = seconds % 60;
     return `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
   };
+
+  if (showEvaluation) {
+    return (
+      <div className="min-h-screen bg-gray-100 py-8">
+        <div className="max-w-4xl mx-auto px-4">
+          <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center">
+            Group Discussion Evaluation
+          </h1>
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Discussion Topic</h2>
+            <p className="text-gray-600">{topic}</p>
+          </div>
+          {userId && <GDEvaluation userId={userId} />}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white">
