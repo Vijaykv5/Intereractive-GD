@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import SpeechToText from "./SpeechRecognition/SpeechToText";
 import { Clock, VideoOff } from "lucide-react";
 import Video from "./VideoElement/Video";
+import AnimatedParticipant from "./AnimatedParticipant";
 import participant1 from '../assets/participant1.png';
 import participant2 from '../assets/participant2.png';
 const topics = [
@@ -24,6 +25,8 @@ const GD: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState<number>(1800); // 30 minutes in seconds
   const [initialTimer, setInitialTimer] = useState<number>(10); // 10 seconds initial timer
   const [canLLMsStart, setCanLLMsStart] = useState<boolean>(false);
+  const [speakingParticipant, setSpeakingParticipant] = useState<number | null>(null);
+  const [participantAudio, setParticipantAudio] = useState<{ [key: number]: string }>({});
 
   useEffect(() => {
     // Select a random topic on component mount
@@ -53,9 +56,27 @@ const GD: React.FC = () => {
       });
     }, 1000);
 
+    // Add this effect to handle participant speaking states
+    const handleParticipantSpeaking = (event: MessageEvent) => {
+      const data = event.data;
+      if (data.type === 'participant_speaking') {
+        setSpeakingParticipant(data.participantId);
+        if (data.audioUrl) {
+          setParticipantAudio(prev => ({
+            ...prev,
+            [data.participantId]: data.audioUrl
+          }));
+        }
+      } else if (data.type === 'participant_stopped_speaking') {
+        setSpeakingParticipant(null);
+      }
+    };
+
+    window.addEventListener('message', handleParticipantSpeaking);
     return () => {
       clearInterval(timer);
       clearInterval(initialTimerInterval);
+      window.removeEventListener('message', handleParticipantSpeaking);
     };
   }, []);
 
@@ -138,24 +159,26 @@ const GD: React.FC = () => {
           </div>  */}
 
           <div className="w-1/3 flex flex-col justify-center space-y-4 py-8">
-            <div className="h-[45%] bg-gray-900/50 rounded-2xl overflow-hidden border border-gray-800 flex items-center justify-center relative">
-              <div className="absolute top-3 left-3 bg-black/50 px-3 py-1 rounded-full">
+            <div className="h-[45%] bg-gray-900/50 rounded-2xl overflow-hidden border border-gray-800 relative">
+              <div className="absolute top-3 left-3 bg-black/50 px-3 py-1 rounded-full z-10">
                 <p className="text-white text-sm">Participant 1</p>
               </div>
-              <img
-                src={participant1}
-                alt="Participant 1"
-                className="w-full h-full object-cover"
+              <AnimatedParticipant
+                participantId={1}
+                image={participant1}
+                isSpeaking={speakingParticipant === 1}
+                audioUrl={participantAudio[1]}
               />
             </div>
-            <div className="h-[45%] bg-gray-900/50 rounded-2xl overflow-hidden border border-gray-800 flex items-center justify-center relative">
-              <div className="absolute top-3 left-3 bg-black/50 px-3 py-1 rounded-full">
+            <div className="h-[45%] bg-gray-900/50 rounded-2xl overflow-hidden border border-gray-800 relative">
+              <div className="absolute top-3 left-3 bg-black/50 px-3 py-1 rounded-full z-10">
                 <p className="text-white text-sm">Participant 2</p>
               </div>
-              <img
-                src={participant2}
-                alt="Participant 2"
-                className="w-full h-full object-cover"
+              <AnimatedParticipant
+                participantId={2}
+                image={participant2}
+                isSpeaking={speakingParticipant === 2}
+                audioUrl={participantAudio[2]}
               />
             </div>
           </div>

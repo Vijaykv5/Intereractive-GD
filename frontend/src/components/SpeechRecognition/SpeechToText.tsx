@@ -44,6 +44,8 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
   const [isAISpeaking, setIsAISpeaking] = useState(false);
   const aiSpeakingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [currentParticipant, setCurrentParticipant] = useState<number | null>(null);
+
   // Function to update conversation history
   const updateConversationHistory = (role: string, content: string) => {
     conversationHistoryRef.current = [...conversationHistoryRef.current, { role, content }];
@@ -284,6 +286,16 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
         throw new Error('No response received from LLM');
       }
 
+      // Determine which participant is speaking based on the endpoint
+      const speakingParticipant = endpoint === 'llm1' ? 1 : 2;
+      setCurrentParticipant(speakingParticipant);
+
+      // Notify parent component about participant speaking
+      window.postMessage({
+        type: 'participant_speaking',
+        participantId: speakingParticipant
+      }, '*');
+
       console.log(`Successfully received response from ${endpoint}:`, data.response);
 
       // Update conversation history with AI response
@@ -309,6 +321,13 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
         const audioBlob = await audioResponse.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
         
+        // Notify parent component about audio URL
+        window.postMessage({
+          type: 'participant_speaking',
+          participantId: speakingParticipant,
+          audioUrl: audioUrl
+        }, '*');
+
         if (audioRef.current) {
           audioRef.current.src = audioUrl;
           setIsAISpeaking(true);
@@ -319,6 +338,11 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
               audioRef.current.pause();
               audioRef.current.currentTime = 0;
               setIsAISpeaking(false);
+              setCurrentParticipant(null);
+              window.postMessage({
+                type: 'participant_stopped_speaking',
+                participantId: speakingParticipant
+              }, '*');
               if (aiSpeakingTimeoutRef.current) {
                 clearTimeout(aiSpeakingTimeoutRef.current);
               }
@@ -331,6 +355,11 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
           audioRef.current.onended = () => {
             URL.revokeObjectURL(audioUrl);
             setIsAISpeaking(false);
+            setCurrentParticipant(null);
+            window.postMessage({
+              type: 'participant_stopped_speaking',
+              participantId: speakingParticipant
+            }, '*');
             audioRef.current?.removeEventListener('pause', handleInterruption);
             
             // Add 3-second delay before next AI response
@@ -357,6 +386,11 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
         // Handle interruption for browser speech synthesis
         utterance.onpause = () => {
           setIsAISpeaking(false);
+          setCurrentParticipant(null);
+          window.postMessage({
+            type: 'participant_stopped_speaking',
+            participantId: speakingParticipant
+          }, '*');
           if (aiSpeakingTimeoutRef.current) {
             clearTimeout(aiSpeakingTimeoutRef.current);
           }
@@ -364,6 +398,11 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
         
         utterance.onend = () => {
           setIsAISpeaking(false);
+          setCurrentParticipant(null);
+          window.postMessage({
+            type: 'participant_stopped_speaking',
+            participantId: speakingParticipant
+          }, '*');
           // Add 3-second delay before next AI response
           aiSpeakingTimeoutRef.current = setTimeout(async () => {
             if (!isHandRaised && !isListening) {
@@ -402,6 +441,11 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
       console.error('Error in sendToLLM:', error);
       setError(error instanceof Error ? error.message : 'Failed to get response from LLM');
       setIsAISpeaking(false);
+      setCurrentParticipant(null);
+      window.postMessage({
+        type: 'participant_stopped_speaking',
+        participantId: currentParticipant
+      }, '*');
     }
   };
 
