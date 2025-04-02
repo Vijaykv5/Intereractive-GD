@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   BookOpen,
   Calendar,
@@ -12,9 +12,26 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
+import GDEvaluation from "./GDEvaluation";
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview");
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Get user data from localStorage when component mounts
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      try {
+        const parsedUser = JSON.parse(userData);
+        if (parsedUser.user_id) {
+          setUserId(parsedUser.user_id);
+        }
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+      }
+    }
+  }, []); // Empty dependency array means this runs once on mount
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -87,6 +104,8 @@ export default function Dashboard() {
                 Start New GD Session
               </button>
             </div>
+
+            {userId && <GDEvaluation userId={userId} />}
 
             {/* Tabs */}
             <div className="w-full">

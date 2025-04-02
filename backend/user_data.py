@@ -244,7 +244,7 @@ def test_endpoint():
 
 @user_data_bp.route('/api/user/<user_id>/data', methods=['GET'])
 def get_user_data(user_id):
-    """Get user's data (without image data for performance)."""
+    """Get user's data including screenshots."""
     try:
         from auth import db
         
@@ -254,17 +254,60 @@ def get_user_data(user_id):
         collection = get_user_speech_collection(db)
         user_data = collection.find_one({"user_id": user_id})
         
+        # Add debug logging
+        logger.info(f"Type of user_data: {type(user_data)}")
+        logger.info(f"Content of user_data: {user_data}")
+        
         if not user_data:
             return jsonify({"success": False, "error": "User not found"}), 404
             
-        # Remove large binary data from response
-        if "screenshots" in user_data:
-            for screenshot in user_data["screenshots"]:
-                if "image_data" in screenshot:
-                    screenshot["image_data"] = f"[Binary data, length: {len(screenshot['image_data'])}]"
+        # Ensure user_data is a dictionary
+        if not isinstance(user_data, dict):
+            logger.error(f"Invalid user_data type: {type(user_data)}")
+            return jsonify({"success": False, "error": "Invalid data format in database"}), 500
+            
+        # Extract all speech entries with safe access
+        try:
+            speech_entries = user_data.get("speech_entries", [])
+            if not isinstance(speech_entries, list):
+                logger.error(f"Invalid speech_entries type: {type(speech_entries)}")
+                return jsonify({"success": False, "error": "Invalid speech entries format"}), 500
+                
+            topic = user_data.get("topic")
+            if not isinstance(topic, str):
+                logger.error(f"Invalid topic type: {type(topic)}")
+                return jsonify({"success": False, "error": "Invalid topic format"}), 500
+        except Exception as e:
+            logger.error(f"Error accessing user_data fields: {e}")
+            return jsonify({"success": False, "error": "Error accessing user data"}), 500
+        
+        if not speech_entries:
+            return jsonify({"success": False, "error": "No speech entries found"}), 404
+            
+        # Combine all speech entries into one text with validation
+        try:
+            full_speech = " ".join([entry.get("text", "") for entry in speech_entries if isinstance(entry, dict)])
+        except Exception as e:
+            logger.error(f"Error combining speech entries: {e}")
+            return jsonify({"success": False, "error": "Error processing speech entries"}), 500
         
         # Convert MongoDB ObjectId to string
         user_data["_id"] = str(user_data["_id"])
+        
+        # Convert datetime objects to strings for JSON serialization
+        if "screenshots" in user_data:
+            for screenshot in user_data["screenshots"]:
+                if isinstance(screenshot, dict):  # Ensure screenshot is a dictionary
+                    if "timestamp" in screenshot:
+                        screenshot["timestamp"] = screenshot["timestamp"].isoformat()
+                    # Ensure image_data is a string
+                    if "image_data" in screenshot and not isinstance(screenshot["image_data"], str):
+                        screenshot["image_data"] = str(screenshot["image_data"])
+        
+        if "speech_entries" in user_data:
+            for entry in user_data["speech_entries"]:
+                if isinstance(entry, dict) and "timestamp" in entry:
+                    entry["timestamp"] = entry["timestamp"].isoformat()
         
         return jsonify({
             "success": True,
@@ -299,7 +342,7 @@ def test_speech_storage():
         # Check if test user exists
         test_user = collection.find_one({"user_id": test_user_id})
         
-        if test_user:
+        if test_user is not None:  # Changed from if test_user:
             # Update existing user
             result = collection.update_one(
                 {"user_id": test_user_id},
@@ -322,7 +365,7 @@ def test_speech_storage():
         # Get the result
         test_user = collection.find_one({"user_id": test_user_id})
         
-        if test_user:
+        if test_user is not None:  # Changed from if test_user:
             # Remove ObjectId for JSON serialization
             test_user["_id"] = str(test_user["_id"])
             
@@ -346,32 +389,76 @@ def test_speech_storage():
 def evaluate_gd_performance(user_id):
     """Fetch user's GD speech and evaluate topic coverage using Qwen."""
     try:
+        logger.info(f"Received GD evaluation request for user_id: {user_id}")
+        
         from auth import db
+        logger.info("Successfully imported db from auth")
         
         if not user_id:
+            logger.error("No user_id provided")
             return jsonify({"success": False, "error": "User ID required"}), 400
             
         if not OPENROUTER_API_KEY:
+            logger.error("OpenRouter API key not configured")
             return jsonify({
                 "success": False, 
                 "error": "OpenRouter API key not configured. Please check your environment variables."
             }), 500
             
         collection = get_user_speech_collection(db)
-        user_data = collection.find_one({"user_id": user_id})
+        logger.info(f"Retrieved collection: {collection.name}")
+        
+        # Log the query we're about to make
+        logger.info(f"Querying MongoDB for user_id: {user_id}")
+        user_data = collection.find_one({"user_id": str(user_id)})
+        
+        # Detailed logging of the response
+        logger.info(f"Type of user_data: {type(user_data)}")
+        logger.info(f"Content of user_data: {user_data}")
         
         if not user_data:
+            logger.error(f"No data found for user_id: {user_id}")
             return jsonify({"success": False, "error": "User not found"}), 404
             
-        # Extract all speech entries
-        speech_entries = user_data.get("speech_entries", [])
-        topic = user_data.get("topic", "")
+        # Ensure user_data is a dictionary
+        if not isinstance(user_data, dict):
+            logger.error(f"Invalid user_data type: {type(user_data)}")
+            return jsonify({"success": False, "error": "Invalid data format in database"}), 500
+            
+        # Extract all speech entries with safe access
+        try:
+            speech_entries = user_data.get("speech_entries", [])
+            logger.info(f"Type of speech_entries: {type(speech_entries)}")
+            logger.info(f"Number of speech entries: {len(speech_entries)}")
+            
+            if not isinstance(speech_entries, list):
+                logger.error(f"Invalid speech_entries type: {type(speech_entries)}")
+                return jsonify({"success": False, "error": "Invalid speech entries format"}), 500
+                
+            topic = user_data.get("topic", "")
+            logger.info(f"Type of topic: {type(topic)}")
+            logger.info(f"Topic value: {topic}")
+            
+            if not isinstance(topic, str):
+                logger.error(f"Invalid topic type: {type(topic)}")
+                return jsonify({"success": False, "error": "Invalid topic format"}), 500
+        except Exception as e:
+            logger.error(f"Error accessing user_data fields: {e}")
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+            return jsonify({"success": False, "error": "Error accessing user data"}), 500
         
         if not speech_entries:
+            logger.error("No speech entries found")
             return jsonify({"success": False, "error": "No speech entries found"}), 404
             
-        # Combine all speech entries into one text
-        full_speech = " ".join([entry["text"] for entry in speech_entries])
+        # Combine all speech entries into one text with validation
+        try:
+            full_speech = " ".join([entry.get("text", "") for entry in speech_entries if isinstance(entry, dict)])
+            logger.info(f"Combined speech length: {len(full_speech)}")
+        except Exception as e:
+            logger.error(f"Error combining speech entries: {e}")
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+            return jsonify({"success": False, "error": "Error processing speech entries"}), 500
         
         try:
             # Make request to OpenRouter API with Qwen model

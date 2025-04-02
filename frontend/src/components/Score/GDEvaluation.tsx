@@ -64,35 +64,35 @@ const GDEvaluation: React.FC<GDEvaluationProps> = ({ userId, onEvaluationComplet
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-        <p className="text-red-600">{error}</p>
+      <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+        <p className="text-red-500">{error}</p>
       </div>
     );
   }
 
   if (!evaluation) {
     return (
-      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p className="text-yellow-600">No evaluation results available</p>
+      <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+        <p className="text-yellow-500">No evaluation results available</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 p-6 bg-white rounded-lg shadow-lg">
+    <div className="space-y-6 p-6 bg-gray-900/50 border border-gray-800 rounded-lg">
       {/* Overall Score */}
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-800">Overall Performance</h2>
+        <h2 className="text-2xl font-bold text-white">Overall Performance</h2>
         <div className="mt-2">
-          <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-blue-100">
-            <span className="text-3xl font-bold text-blue-600">
+          <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-yellow-500/10 border border-yellow-500/20">
+            <span className="text-3xl font-bold text-yellow-500">
               {Math.round(evaluation.overall_score * 100)}%
             </span>
           </div>
@@ -101,37 +101,37 @@ const GDEvaluation: React.FC<GDEvaluationProps> = ({ userId, onEvaluationComplet
 
       {/* Topic Coverage */}
       <div className="space-y-4">
-        <h3 className="text-xl font-semibold text-gray-800">Topic Coverage</h3>
+        <h3 className="text-xl font-semibold text-white">Topic Coverage</h3>
         <div className="flex items-center space-x-4">
           <div className="flex-1">
-            <div className="h-2 bg-gray-200 rounded-full">
+            <div className="h-2 bg-gray-800 rounded-full">
               <div
-                className="h-2 bg-green-500 rounded-full"
+                className="h-2 bg-yellow-500 rounded-full"
                 style={{ width: `${evaluation.topic_coverage.score * 100}%` }}
               />
             </div>
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="mt-1 text-sm text-gray-400">
               Score: {Math.round(evaluation.topic_coverage.score * 100)}%
             </p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <h4 className="font-medium text-gray-700">Key Points Covered</h4>
+            <h4 className="font-medium text-white">Key Points Covered</h4>
             <ul className="mt-2 space-y-1">
               {evaluation.topic_coverage.key_points_covered.map((point, index) => (
-                <li key={index} className="flex items-center text-sm text-gray-600">
-                  <span className="w-2 h-2 bg-green-500 rounded-full mr-2" />
+                <li key={index} className="flex items-center text-sm text-gray-400">
+                  <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2" />
                   {point}
                 </li>
               ))}
             </ul>
           </div>
           <div>
-            <h4 className="font-medium text-gray-700">Missing Points</h4>
+            <h4 className="font-medium text-white">Missing Points</h4>
             <ul className="mt-2 space-y-1">
               {evaluation.topic_coverage.missing_points.map((point, index) => (
-                <li key={index} className="flex items-center text-sm text-gray-600">
+                <li key={index} className="flex items-center text-sm text-gray-400">
                   <span className="w-2 h-2 bg-red-500 rounded-full mr-2" />
                   {point}
                 </li>
@@ -143,68 +143,89 @@ const GDEvaluation: React.FC<GDEvaluationProps> = ({ userId, onEvaluationComplet
 
       {/* Detailed Analysis */}
       <div className="space-y-4">
-        <h3 className="text-xl font-semibold text-gray-800">Detailed Analysis</h3>
+        <h3 className="text-xl font-semibold text-white">Detailed Analysis</h3>
         <div className="grid grid-cols-2 gap-4">
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <h4 className="font-medium text-gray-700">Depth of Analysis</h4>
-            <div className="mt-2">
-              <div className="h-2 bg-gray-200 rounded-full">
-                <div
-                  className="h-2 bg-blue-500 rounded-full"
-                  style={{ width: `${evaluation.depth_of_analysis.score * 100}%` }}
-                />
+          <div className="group relative">
+            <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg cursor-pointer transition-all duration-300 hover:border-yellow-500/50">
+              <h4 className="font-medium text-white flex items-center justify-between">
+                Depth of Analysis
+                
+              </h4>
+              <div className="mt-2">
+                <div className="h-2 bg-gray-800 rounded-full">
+                  <div
+                    className="h-2 bg-yellow-500 rounded-full"
+                    style={{ width: `${evaluation.depth_of_analysis.score * 100}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-sm text-gray-400">
+                  Score: {Math.round(evaluation.depth_of_analysis.score * 100)}%
+                </p>
               </div>
-              <p className="mt-1 text-sm text-gray-600">
-                Score: {Math.round(evaluation.depth_of_analysis.score * 100)}%
-              </p>
+              <div className="mt-2 text-sm text-gray-400 max-h-0 overflow-hidden transition-all duration-300 group-hover:max-h-[200px]">
+                {evaluation.depth_of_analysis.analysis}
+              </div>
             </div>
-            <p className="mt-2 text-sm text-gray-600">{evaluation.depth_of_analysis.analysis}</p>
           </div>
 
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <h4 className="font-medium text-gray-700">Relevance</h4>
-            <div className="mt-2">
-              <div className="h-2 bg-gray-200 rounded-full">
-                <div
-                  className="h-2 bg-purple-500 rounded-full"
-                  style={{ width: `${evaluation.relevance.score * 100}%` }}
-                />
+          <div className="group relative">
+            <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg cursor-pointer transition-all duration-300 hover:border-yellow-500/50">
+              <h4 className="font-medium text-white flex items-center justify-between">
+                Relevance
+               
+              </h4>
+              <div className="mt-2">
+                <div className="h-2 bg-gray-800 rounded-full">
+                  <div
+                    className="h-2 bg-yellow-500 rounded-full"
+                    style={{ width: `${evaluation.relevance.score * 100}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-sm text-gray-400">
+                  Score: {Math.round(evaluation.relevance.score * 100)}%
+                </p>
               </div>
-              <p className="mt-1 text-sm text-gray-600">
-                Score: {Math.round(evaluation.relevance.score * 100)}%
-              </p>
+              <div className="mt-2 text-sm text-gray-400 max-h-0 overflow-hidden transition-all duration-300 group-hover:max-h-[200px]">
+                {evaluation.relevance.analysis}
+              </div>
             </div>
-            <p className="mt-2 text-sm text-gray-600">{evaluation.relevance.analysis}</p>
           </div>
 
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <h4 className="font-medium text-gray-700">Structure</h4>
-            <div className="mt-2">
-              <div className="h-2 bg-gray-200 rounded-full">
-                <div
-                  className="h-2 bg-orange-500 rounded-full"
-                  style={{ width: `${evaluation.structure.score * 100}%` }}
-                />
+          <div className="group relative">
+            <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg cursor-pointer transition-all duration-300 hover:border-yellow-500/50">
+              <h4 className="font-medium text-white flex items-center justify-between">
+                Structure
+                
+              </h4>
+              <div className="mt-2">
+                <div className="h-2 bg-gray-800 rounded-full">
+                  <div
+                    className="h-2 bg-yellow-500 rounded-full"
+                    style={{ width: `${evaluation.structure.score * 100}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-sm text-gray-400">
+                  Score: {Math.round(evaluation.structure.score * 100)}%
+                </p>
               </div>
-              <p className="mt-1 text-sm text-gray-600">
-                Score: {Math.round(evaluation.structure.score * 100)}%
-              </p>
+              <div className="mt-2 text-sm text-gray-400 max-h-0 overflow-hidden transition-all duration-300 group-hover:max-h-[200px]">
+                {evaluation.structure.analysis}
+              </div>
             </div>
-            <p className="mt-2 text-sm text-gray-600">{evaluation.structure.analysis}</p>
           </div>
         </div>
       </div>
 
       {/* Summary and Suggestions */}
       <div className="space-y-4">
-        <h3 className="text-xl font-semibold text-gray-800">Summary</h3>
-        <p className="text-gray-600">{evaluation.summary}</p>
+        <h3 className="text-xl font-semibold text-white">Summary</h3>
+        <p className="text-gray-400">{evaluation.summary}</p>
 
-        <h3 className="text-xl font-semibold text-gray-800">Suggestions for Improvement</h3>
+        <h3 className="text-xl font-semibold text-white">Suggestions for Improvement</h3>
         <ul className="space-y-2">
           {evaluation.suggestions.map((suggestion, index) => (
-            <li key={index} className="flex items-start text-gray-600">
-              <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-2" />
+            <li key={index} className="flex items-start text-gray-400">
+              <span className="w-2 h-2 bg-yellow-500 rounded-full mt-2 mr-2" />
               {suggestion}
             </li>
           ))}
