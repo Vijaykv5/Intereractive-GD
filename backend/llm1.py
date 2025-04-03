@@ -50,11 +50,11 @@ def get_llm_response():
         is_user_message = data.get("is_user_message", False)
 
         if is_initial:
-            prompt = f"""You are starting a group discussion about "{topic}". Give a simple introduction in 40-50 words that sets the context and invites others to share their views. Use plain text without any special characters or emojis."""
+            prompt = f"""You are starting a group discussion about "{topic}". Give a simple introduction in 40-50 words that sets the context and invites others to share their views. Use plain text without any special characters or emojis. Speak in a male voice."""
         elif is_user_message:
-            prompt = f"""You are in a group discussion about "{topic}". A participant just said: "{text}". Respond directly to their point in 40-50 words. Use plain text without any special characters or emojis. Keep your response simple and conversational."""
+            prompt = f"""You are in a group discussion about "{topic}". A participant just said: "{text}". Respond directly to their point in 40-50 words. Use plain text without any special characters or emojis. Keep your response simple and conversational. Speak in a male voice."""
         else:
-            prompt = f"""You are in a group discussion about "{topic}". Respond in 40-50 words to: {text}. Use plain text without any special characters or emojis. Keep your response simple and conversational."""
+            prompt = f"""You are in a group discussion about "{topic}". Respond in 40-50 words to: {text}. Use plain text without any special characters or emojis. Keep your response simple and conversational. Speak in a male voice."""
 
         completion = client.chat.completions.create(
             extra_headers={
@@ -92,7 +92,8 @@ def text_to_speech():
             return jsonify({"success": False, "error": "No text provided"}), 400
 
         text = data.get("text")
-        tts = gTTS(text=text, lang='en', tld='com.au')
+        # Using 'co.uk' tld for a more British male voice and explicitly setting male voice parameters
+        tts = gTTS(text=text, lang='en', tld='co.uk', slow=False)
         
         audio_stream = io.BytesIO()
         tts.write_to_fp(audio_stream)
@@ -106,7 +107,7 @@ def text_to_speech():
 # This is an alternative implementation if you want to try another option
 @llm_bp.route('/api/tts/alt', methods=['POST'])
 def alt_text_to_speech():
-    """Alternative TTS using pyttsx3 with a sweet female voice."""
+    """Alternative TTS using pyttsx3 with a male voice."""
     try:
         import pyttsx3
         import tempfile
@@ -124,11 +125,10 @@ def alt_text_to_speech():
         # Get available voices
         voices = engine.getProperty('voices')
         
-        # Select a female voice (index may vary by system)
-        # Usually the second voice (index 1) is female on most systems
+        # Select a male voice (usually the first voice is male)
         engine.setProperty('voice', voices[1].id)
         
-        # Set a higher pitch for a sweeter sound
+        # Set appropriate rate and volume for male voice
         engine.setProperty('rate', 150)  # Speed
         engine.setProperty('volume', 0.9)  # Volume
         

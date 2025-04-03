@@ -623,4 +623,92 @@ Respond with this exact JSON structure (no other text):
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
+@user_data_bp.route('/api/user/<user_id>/screenshots', methods=['GET'])
+def get_user_screenshots(user_id):
+    logger.info(f"Fetching screenshots for user_id: {user_id}")
+    """Get all screenshots for a specific user."""
+    try:
+        logger.info(f"Fetching screenshots for user_id: {user_id}")
+        
+        from auth import db
+        logger.info("Successfully imported db from auth")
+        
+        if not user_id:
+            logger.error("No user_id provided")
+            return jsonify({"success": False, "error": "User ID required"}), 400
+            
+        collection = get_user_speech_collection(db)
+        logger.info(f"Retrieved collection: {collection.name}")
+        
+        # Log the query we're about to make
+        query = {"user_id": str(user_id)}
+        logger.info(f"Querying MongoDB with: {query}")
+        
+        # Find user's document
+        user_data = collection.find_one(query)
+        
+        # Log the result
+        logger.info(f"Query result: {user_data}")
+        
+        if not user_data:
+            logger.error(f"No data found for user_id: {user_id}")
+            # Let's check if the user exists in any format
+            all_users = list(collection.find({}, {"user_id": 1}))
+            logger.info(f"Available users in database: {all_users}")
+            return jsonify({
+                "success": False, 
+                "error": "User not found",
+                "debug_info": {
+                    "searched_user_id": user_id,
+                    "available_users": [user.get("user_id") for user in all_users]
+                }
+            }), 404
+            
+        # Get screenshots array from user data
+        screenshots = user_data.get("screenshots", [])
+        logger.info(f"Found {len(screenshots)} screenshots for user")
+        
+        # Convert datetime objects to ISO format strings for JSON serialization
+        for screenshot in screenshots:
+            if isinstance(screenshot, dict) and "timestamp" in screenshot:
+                screenshot["timestamp"] = screenshot["timestamp"].isoformat()
+        
+        return jsonify({
+            "success": True,
+            "data": {
+                "screenshots": screenshots
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching screenshots: {e}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# @user_data_bp.route('/api/users/list', methods=['GET'])
+# def list_all_users():
+    """List all users in the database."""
+    try:
+        from auth import db
+        collection = get_user_speech_collection(db)
+        
+        # Get all users with their IDs
+        users = list(collection.find({}, {"user_id": 1, "topic": 1}))
+        
+        # Convert ObjectId to string for JSON serialization
+        for user in users:
+            user["_id"] = str(user["_id"])
+        
+        return jsonify({
+            "success": True,
+            "data": {
+                "users": users
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error listing users: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    
+
 

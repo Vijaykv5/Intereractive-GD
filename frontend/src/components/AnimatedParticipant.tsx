@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import lip1 from "../assets/lip1.png";
+import face from "../assets/face.jpg";
+import lips from "../assets/lips.png";
 // import lip2 from "../assets/lip2.png";
 
 
@@ -37,46 +38,65 @@ const AnimatedParticipant: React.FC<AnimatedParticipantProps> = ({
       <motion.div
         className="relative h-full w-full"
         animate={{
-          scale: isAnimating ? [1, 1.02, 1] : 1,
-          rotate: isAnimating ? [0, 0.5, -0.5, 0] : 0,
-        }}
-        transition={{
-          duration: 0.4,
-          repeat: isAnimating ? Infinity : 0,
-          ease: "easeInOut",
+          scale: 1,
+          rotate: 0,
         }}
       >
+        {/* Highlight border */}
+        <motion.div
+          className="absolute inset-0 border-4 border-transparent rounded-lg"
+          animate={{
+            borderColor: isAnimating
+              ? ["#4CAF50", "#8BC34A", "#4CAF50"]
+              : "transparent",
+            borderWidth: isAnimating ? [4, 6, 4] : 0,
+          }}
+          transition={{
+            duration: 0.4,
+            repeat: isAnimating ? Infinity : 0,
+            ease: "easeInOut",
+          }}
+        />
+
         {/* Base participant image */}
         <img
-          src={image}
+          src={face}
           alt={`Participant ${participantId}`}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover rounded-lg"
         />
 
         {/* Animated lip overlay */}
         <motion.img
-          src={lip1}
+          src={lips}
           alt="Lip animation"
-          className="absolute bottom-[40%] left-[38%] transform -translate-x-1/2 w-[90px] h-auto z-10"
+          className="absolute bottom-[72%] left-[43%] transform -translate-x-1/2 w-[32px] h-auto z-10"
           initial={{ scale: 1, translateY: 0 }}
-          animate={isAnimating ? {
-            scale: [1, 1.1, 0.95, 1],
-            translateY: [0, -1, 0.5, 0],
-          } : {
-            scale: 1,
-            translateY: 0
-          }}
-          transition={isAnimating ? {
-            duration: 0.4,
-            repeat: Infinity,
-            ease: "easeInOut",
-          } : {
-            duration: 0.2,
-            ease: "easeOut"
-          }}
+          animate={
+            isAnimating
+              ? {
+                  scale: [1, 1.1, 0.95, 1],
+                  translateY: [0, -1, 0.5, 0],
+                }
+              : {
+                  scale: 1,
+                  translateY: 0,
+                }
+          }
+          transition={
+            isAnimating
+              ? {
+                  duration: 0.4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }
+              : {
+                  duration: 0.2,
+                  ease: "easeOut",
+                }
+          }
           style={{
             mixBlendMode: "normal",
-            objectFit: "contain"
+            objectFit: "contain",
           }}
         />
       </motion.div>

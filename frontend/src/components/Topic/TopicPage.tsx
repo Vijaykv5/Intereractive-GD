@@ -17,11 +17,23 @@ const topics = [
 ];
 
 const TopicPage = () => {
-  const [topic, setTopic] = useState(topics[0]);
-  const [timeLeft, setTimeLeft] = useState(60); // 60 seconds = 1 minute
-  const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const userId = user?.user_id;
+  const storedTopic = localStorage.getItem("currentTopic");
+  const storedTimeLeft = localStorage.getItem("timeLeft");
+  
+  const [topic, setTopic] = useState(storedTopic || topics[0]);
+  const [timeLeft, setTimeLeft] = useState(storedTimeLeft ? parseInt(storedTimeLeft) : 60);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!storedTopic) {
+      localStorage.setItem("currentTopic", topic);
+    }
+    if (!storedTimeLeft) {
+      localStorage.setItem("timeLeft", timeLeft.toString());
+    }
+  }, []);
 
   useEffect(() => {
     if (timeLeft <= 0) {
@@ -30,7 +42,11 @@ const TopicPage = () => {
     }
 
     const timer = setInterval(() => {
-      setTimeLeft((prevTime) => prevTime - 1);
+      setTimeLeft((prevTime) => {
+        const newTime = prevTime - 1;
+        localStorage.setItem("timeLeft", newTime.toString());
+        return newTime;
+      });
     }, 1000);
 
     return () => clearInterval(timer);
@@ -52,6 +68,15 @@ const TopicPage = () => {
       randomIndex = Math.floor(Math.random() * topics.length);
     } while (randomIndex === currentIndex);
     return topics[randomIndex];
+  };
+
+  const handleTopicChange = () => {
+    const newTopic = getRandomTopic();
+    setTopic(newTopic);
+    localStorage.setItem("currentTopic", newTopic);
+    // Reset timer to 60 seconds when topic changes
+    setTimeLeft(60);
+    localStorage.setItem("timeLeft", "60");
   };
 
   return (
@@ -121,7 +146,7 @@ const TopicPage = () => {
           <div className="inline-flex items-center rounded-full border border-yellow-500/20 bg-yellow-500/10 px-3 py-1 text-sm text-yellow-500 mx-auto">
             <button
               className="hover:bg-yellow-500/20 transition-colors rounded-full px-3 py-1"
-              onClick={() => setTopic(getRandomTopic())}
+              onClick={handleTopicChange}
             >
               Change Topic
             </button>

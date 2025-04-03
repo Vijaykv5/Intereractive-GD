@@ -38,8 +38,11 @@ const GD: React.FC = () => {
       setUserId(user.user_id);
     }
 
-    // Select a random topic on component mount
-    setTopic(topics[Math.floor(Math.random() * topics.length)]);
+    // Get topic from localStorage
+    const storedTopic = localStorage.getItem("currentTopic");
+    if (storedTopic) {
+      setTopic(storedTopic);
+    }
 
     // Initial 10-second timer
     const initialTimerInterval = setInterval(() => {
