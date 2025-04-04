@@ -26,6 +26,7 @@ from auth import auth_bp
 from llm1 import llm_bp as llm1_bp
 from llm2 import llm_bp as llm2_bp
 from user_data import user_data_bp
+from routes.screenshot_routes import screenshot_bp
 # from gd_routes import gd_bp  # Import the new blueprint
 
 # Register blueprints
@@ -33,6 +34,7 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(llm1_bp)
 app.register_blueprint(llm2_bp)
 app.register_blueprint(user_data_bp)
+app.register_blueprint(screenshot_bp)
 # app.register_blueprint(gd_bp)  # Register the new blueprint
 
 # Add CORS headers to all responses

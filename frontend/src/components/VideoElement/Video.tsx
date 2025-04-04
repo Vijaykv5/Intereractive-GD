@@ -36,7 +36,7 @@ const Video: React.FC<VideoProps> = ({
     const takeScreenshot = async () => {
       if (videoRef.current && isVideoOn) {
         try {
-          console.log("Taking screenshot (every 2 minutes)...");
+          console.log("Taking screenshot (every 30 seconds)...");
           const user = JSON.parse(localStorage.getItem("user") || "{}");
           if (!user || !user.user_id) {
             console.warn("Cannot take screenshot: No user ID found");
@@ -65,8 +65,8 @@ const Video: React.FC<VideoProps> = ({
     // Only start taking screenshots if video is enabled
     let screenshotInterval: number | null = null;
     if (isVideoOn) {
-      console.log("Setting up screenshot interval (120 seconds)");
-      screenshotInterval = window.setInterval(takeScreenshot, 120000); // Every 2 minutes
+      console.log("Setting up screenshot interval (30 seconds)");
+      screenshotInterval = window.setInterval(takeScreenshot, 30000); // Every 30 seconds
       
       // Don't take an initial screenshot immediately - wait for the first interval
       // This prevents duplicates at startup

@@ -51,16 +51,40 @@ def get_qwen_evaluation(prompt):
         )
         
         if response.status_code == 200:
-            result = response.json()
-            # Extract the response text from the completion
-            evaluation_text = result['choices'][0]['message']['content']
-            # Parse the JSON string from the response
-            return json.loads(evaluation_text)
+            try:
+                result = response.json()
+                # Check if result and result['choices'] exist and have content
+                if not result or 'choices' not in result or not result['choices']:
+                    logger.error("Invalid response from Qwen API: missing choices")
+                    return {"success": False, "error": "Invalid response from Qwen API: missing choices"}
+                
+                if not result['choices'][0] or 'message' not in result['choices'][0]:
+                    logger.error("Invalid response from Qwen API: missing message")
+                    return {"success": False, "error": "Invalid response from Qwen API: missing message"}
+                
+                if not result['choices'][0]['message'] or 'content' not in result['choices'][0]['message']:
+                    logger.error("Invalid response from Qwen API: missing content")
+                    return {"success": False, "error": "Invalid response from Qwen API: missing content"}
+                
+                # Extract the response text from the completion
+                evaluation_text = result['choices'][0]['message']['content']
+                # Parse the JSON string from the response
+                try:
+                    return {"success": True, "data": json.loads(evaluation_text)}
+                except json.JSONDecodeError as e:
+                    logger.error(f"Error parsing JSON from Qwen response: {e}")
+                    return {"success": False, "error": f"Invalid JSON in Qwen response: {str(e)}"}
+            except Exception as e:
+                logger.error(f"Error processing Qwen API response: {e}")
+                return {"success": False, "error": f"Error processing Qwen API response: {str(e)}"}
         else:
-            raise Exception(f"API request failed with status {response.status_code}: {response.text}")
+            error_msg = f"API request failed with status {response.status_code}: {response.text}"
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg}
             
     except Exception as e:
-        raise Exception(f"Failed to get evaluation from Qwen: {str(e)}")
+        logger.error(f"Failed to get evaluation from Qwen: {str(e)}")
+        return {"success": False, "error": f"Failed to get evaluation from Qwen: {str(e)}"}
 
 @user_data_bp.route('/api/user/speech', methods=['POST'])
 def store_speech():
@@ -526,6 +550,28 @@ Respond with this exact JSON structure (no other text):
             
             if response.status_code == 200:
                 result = response.json()
+                # Check if result and result['choices'] exist and have content
+                if not result or 'choices' not in result or not result['choices']:
+                    logger.error("Invalid response from Qwen API: missing choices")
+                    return jsonify({
+                        "success": False,
+                        "error": "Invalid response from Qwen API: missing choices"
+                    }), 500
+                
+                if not result['choices'][0] or 'message' not in result['choices'][0]:
+                    logger.error("Invalid response from Qwen API: missing message")
+                    return jsonify({
+                        "success": False,
+                        "error": "Invalid response from Qwen API: missing message"
+                    }), 500
+                
+                if not result['choices'][0]['message'] or 'content' not in result['choices'][0]['message']:
+                    logger.error("Invalid response from Qwen API: missing content")
+                    return jsonify({
+                        "success": False,
+                        "error": "Invalid response from Qwen API: missing content"
+                    }), 500
+                
                 # Extract and clean the evaluation text from the response
                 evaluation_text = result['choices'][0]['message']['content']
                 
@@ -685,6 +731,108 @@ def get_user_screenshots(user_id):
         logger.error(f"Full traceback: {traceback.format_exc()}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+@user_data_bp.route('/api/user/speaking-time', methods=['POST'])
+def store_speaking_time():
+    """Store user's speaking time data in MongoDB."""
+    try:
+        logger.info("Speaking time storage request received")
+        
+        try:
+            from auth import db
+            logger.info("Successfully imported db from auth")
+        except ImportError as ie:
+            logger.error(f"Failed to import db from auth: {ie}")
+            return jsonify({"success": False, "error": "Server configuration error"}), 500
+        
+        data = request.get_json()
+        logger.info(f"Received data: {data}")
+        
+        user_id = data.get("user_id")
+        session_id = data.get("session_id")
+        speaking_duration = data.get("speaking_duration", 0)  # in seconds
+        total_duration = data.get("total_duration", 0)  # in seconds
+        
+        logger.info(f"Processing speaking time for user {user_id}, session: {session_id}")
+        
+        if not user_id or not session_id:
+            logger.error("Missing required data")
+            return jsonify({"success": False, "error": "Missing required data"}), 400
+            
+        collection = get_user_speech_collection(db)
+        logger.info(f"Retrieved collection: {collection.name}")
+        
+        # Create speaking time entry
+        speaking_time_entry = {
+            "timestamp": datetime.utcnow(),
+            "user_id": user_id,
+            "session_id": session_id,
+            "speaking_duration": speaking_duration,
+            "total_duration": total_duration,
+            "percentage": (speaking_duration / total_duration * 100) if total_duration > 0 else 0
+        }
+        
+        # Update or insert the speaking time entry
+        result = collection.update_one(
+            {"user_id": user_id, "session_id": session_id},
+            {"$set": speaking_time_entry},
+            upsert=True
+        )
+        
+        logger.info(f"Successfully stored speaking time entry")
+        
+        return jsonify({
+            "success": True,
+            "message": "Speaking time stored successfully",
+            "percentage": speaking_time_entry["percentage"]
+        })
+        
+    except Exception as e:
+        logger.error(f"Error storing speaking time: {e}")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@user_data_bp.route('/api/user/speaking-stats/<user_id>', methods=['GET'])
+def get_speaking_stats(user_id):
+    """Get user's speaking time statistics."""
+    try:
+        logger.info(f"Getting speaking stats for user {user_id}")
+        
+        try:
+            from auth import db
+        except ImportError as ie:
+            logger.error(f"Failed to import db from auth: {ie}")
+            return jsonify({"success": False, "error": "Server configuration error"}), 500
+        
+        collection = get_user_speech_collection(db)
+        
+        # Get all speaking time entries for the user
+        entries = list(collection.find(
+            {"user_id": user_id},
+            {"speaking_duration": 1, "total_duration": 1, "percentage": 1, "_id": 0}
+        ))
+        
+        if not entries:
+            return jsonify({
+                "success": True,
+                "average_percentage": 0,
+                "total_sessions": 0
+            })
+        
+        # Calculate average percentage
+        total_percentage = sum(entry.get("percentage", 0) for entry in entries)
+        average_percentage = total_percentage / len(entries)
+        
+        return jsonify({
+            "success": True,
+            "average_percentage": round(average_percentage, 2),
+            "total_sessions": len(entries)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting speaking stats: {e}")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
 # @user_data_bp.route('/api/users/list', methods=['GET'])
 # def list_all_users():
     """List all users in the database."""
@@ -710,5 +858,4 @@ def get_user_screenshots(user_id):
         logger.error(f"Error listing users: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
     
-
 

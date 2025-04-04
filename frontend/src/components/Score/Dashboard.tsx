@@ -13,10 +13,19 @@ import {
   Users,
 } from "lucide-react";
 import GDEvaluation from "./GDEvaluation";
+import ScreenshotEvaluation from "./ScreenshotEvaluation";
+import SpeakingTimeScore from "./SpeakingTimeScore";
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [userId, setUserId] = useState<string | null>(null);
+  const [speakingStats, setSpeakingStats] = useState<{
+    average_percentage: number;
+    total_sessions: number;
+  }>({
+    average_percentage: 0,
+    total_sessions: 0
+  });
 
   useEffect(() => {
     // Get user data from localStorage when component mounts
@@ -26,12 +35,31 @@ export default function Dashboard() {
         const parsedUser = JSON.parse(userData);
         if (parsedUser.user_id) {
           setUserId(parsedUser.user_id);
+          // Fetch speaking stats
+          fetchSpeakingStats(parsedUser.user_id);
         }
       } catch (error) {
         console.error("Error parsing user data:", error);
       }
     }
   }, []); // Empty dependency array means this runs once on mount
+
+  const fetchSpeakingStats = async (userId: string) => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/user/speaking-stats/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setSpeakingStats({
+            average_percentage: data.average_percentage,
+            total_sessions: data.total_sessions
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching speaking stats:", error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -106,6 +134,8 @@ export default function Dashboard() {
             </div>
 
             {userId && <GDEvaluation userId={userId} />}
+            {/* {userId && <ScreenshotEvaluation userId={userId} />} */}
+            {userId && <SpeakingTimeScore userId={userId} />}
 
             {/* Tabs */}
             <div className="w-full">
@@ -125,7 +155,7 @@ export default function Dashboard() {
                 ))}
               </div>
 
-              {/* Overview Tab Content */}
+              
               {activeTab === "overview" && (
                 <div className="mt-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -159,7 +189,7 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Sessions Completed */}
+                  
                     <div className="bg-gray-900/50 border border-gray-800 rounded-lg overflow-hidden">
                       <div className="p-4 pb-2">
                         <h3 className="text-lg font-medium flex items-center">
@@ -179,7 +209,7 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Speaking Time */}
+                   
                     <div className="bg-gray-900/50 border border-gray-800 rounded-lg overflow-hidden">
                       <div className="p-4 pb-2">
                         <h3 className="text-lg font-medium flex items-center">
@@ -188,9 +218,9 @@ export default function Dashboard() {
                         </h3>
                       </div>
                       <div className="p-4 pt-0">
-                        <div className="text-4xl font-bold">24%</div>
+                        <div className="text-4xl font-bold">{speakingStats.average_percentage}%</div>
                         <p className="text-sm text-gray-400 mt-1">
-                          Average in sessions
+                          Average in {speakingStats.total_sessions} sessions
                         </p>
                         <div className="mt-4">
                           <div className="flex justify-between text-xs mb-1">
@@ -199,13 +229,16 @@ export default function Dashboard() {
                           </div>
                           <div className="h-2 bg-gray-800 rounded-full relative">
                             <div className="absolute h-full w-[60%] bg-gray-700 rounded-full"></div>
-                            <div className="absolute h-full w-[24%] bg-yellow-500 rounded-full"></div>
+                            <div 
+                              className="absolute h-full bg-yellow-500 rounded-full"
+                              style={{ width: `${Math.min(speakingStats.average_percentage, 100)}%` }}
+                            ></div>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Interruptions */}
+                    
                     <div className="bg-gray-900/50 border border-gray-800 rounded-lg overflow-hidden">
                       <div className="p-4 pb-2">
                         <h3 className="text-lg font-medium flex items-center">
@@ -226,7 +259,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Skill Breakdown */}
+               
                   <div className="mt-6 bg-gray-900/50 border border-gray-800 rounded-lg overflow-hidden">
                     <div className="p-4">
                       <h3 className="text-lg font-bold">Skill Breakdown</h3>
@@ -304,7 +337,7 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* Recent GDs Tab Content */}
+              
               {activeTab === "recent" && (
                 <div className="mt-6">
                   <div className="grid grid-cols-1 gap-4">
@@ -374,7 +407,7 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* Feedback Tab Content */}
+              
               {activeTab === "feedback" && (
                 <div className="mt-6">
                   <div className="bg-gray-900/50 border border-gray-800 rounded-lg overflow-hidden">

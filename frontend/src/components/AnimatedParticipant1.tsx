@@ -1,21 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import face from "../assets/face.jpg";
-import face2 from "../assets/face2.jpg";
 import lips from "../assets/lips.png";
-import lip2 from "../assets/lips2.png";
-
 
 interface AnimatedParticipantProps {
-  participantId: number;
-  image: string;
   isSpeaking: boolean;
   audioUrl?: string;
 }
 
-const AnimatedParticipant: React.FC<AnimatedParticipantProps> = ({
-  participantId,
-  image,
+const AnimatedParticipant1: React.FC<AnimatedParticipantProps> = ({
   isSpeaking,
   audioUrl,
 }) => {
@@ -61,16 +54,16 @@ const AnimatedParticipant: React.FC<AnimatedParticipantProps> = ({
 
         {/* Base participant image */}
         <img
-          src={participantId === 1 ? face : face2}
-          alt={`Participant ${participantId}`}
+          src={face}
+          alt="Participant 1"
           className="w-full h-full object-cover rounded-lg"
         />
 
         {/* Animated lip overlay */}
         <motion.img
-          src={participantId === 1 ? lips : lip2}
+          src={lips}
           alt="Lip animation"
-          className="absolute bottom-[76%] left-[46%] transform -translate-x-1/2 w-[34px] h-auto z-10"
+          className="absolute bottom-[74%] left-[43%] transform -translate-x-1/2 w-[32px] h-auto z-10"
           initial={{ scale: 1, translateY: 0 }}
           animate={
             isAnimating
@@ -105,4 +98,4 @@ const AnimatedParticipant: React.FC<AnimatedParticipantProps> = ({
   );
 };
 
-export default AnimatedParticipant; 
+export default AnimatedParticipant1; 

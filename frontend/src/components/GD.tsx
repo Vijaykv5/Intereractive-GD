@@ -6,6 +6,7 @@ import Video from "./VideoElement/Video";
 import AnimatedParticipant from "./AnimatedParticipant";
 import participant1 from '../assets/participant1.png';
 import participant2 from '../assets/participant2.png';
+import { useNavigate } from "react-router-dom";
 const topics = [
   "Impact of Artificial Intelligence on Job Markets",
   "Cryptocurrencies: Future of Finance or Bubble?",
@@ -22,8 +23,9 @@ const topics = [
 ];
 
 const GD: React.FC = () => {
+  const navigate = useNavigate();
   const [topic, setTopic] = useState<string>("");
-  const [timeLeft, setTimeLeft] = useState<number>(1800); // 30 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState<number>(240); // 4 minutes in seconds
   const [initialTimer, setInitialTimer] = useState<number>(10); // 10 seconds initial timer
   const [canLLMsStart, setCanLLMsStart] = useState<boolean>(false);
   const [speakingParticipant, setSpeakingParticipant] = useState<number | null>(null);
@@ -62,6 +64,7 @@ const GD: React.FC = () => {
         if (prev <= 1) {
           clearInterval(timer);
           setShowEvaluation(true);
+          navigate('/dashboard'); // Navigate to dashboard when timer runs out
           return 0;
         }
         return prev - 1;
@@ -90,7 +93,7 @@ const GD: React.FC = () => {
       clearInterval(initialTimerInterval);
       window.removeEventListener('message', handleParticipantSpeaking);
     };
-  }, []);
+  }, [navigate]);
 
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -124,9 +127,17 @@ const GD: React.FC = () => {
       <div className="relative z-10 w-full bg-gray-900/50 backdrop-blur-sm border-b border-white/10 mb-2">
         <div className="max-w-7xl mx-auto px-4 py-4 relative">
           {/* Timer */}
-          <div className="absolute top-4 left-4 bg-yellow-500 text-black px-4 py-2 rounded-full flex items-center space-x-2">
+          <div className={`absolute top-4 left-4 px-4 py-2 rounded-full flex items-center space-x-2 transition-all duration-300 ${
+            timeLeft <= 10 
+              ? "bg-red-500 animate-pulse scale-110" 
+              : timeLeft <= 60 
+                ? "bg-yellow-500 animate-pulse" 
+                : "bg-yellow-500"
+          }`}>
             <Clock className="w-5 h-5" />
-            <span className="font-semibold">{formatTime(timeLeft)}</span>
+            <span className={`font-semibold ${
+              timeLeft <= 10 ? "text-2xl" : "text-base"
+            }`}>{formatTime(timeLeft)}</span>
           </div>
 
           {/* Initial Timer */}

@@ -6,6 +6,7 @@ from gtts import gTTS
 import os
 import requests
 import logging
+import time
 from dotenv import load_dotenv
 
 # Set up logging
@@ -21,7 +22,12 @@ def init_api_keys():
         load_dotenv()
         api_key = os.getenv("OPENROUTER_API_KEY")
         if not api_key:
+            logger.error("OPENROUTER_API_KEY environment variable is missing")
             raise ValueError("OPENROUTER_API_KEY environment variable is required")
+        
+        # Log the first few characters of the API key for debugging (not the full key for security)
+        masked_key = api_key[:4] + "..." + api_key[-4:] if len(api_key) > 8 else "***"
+        logger.info(f"Initializing OpenRouter API with key: {masked_key}")
         
         # Initialize OpenAI client with OpenRouter
         global client
@@ -31,7 +37,7 @@ def init_api_keys():
         )
         logger.info("Successfully configured OpenRouter API")
     except Exception as e:
-        logger.error(f"Error in initializing API keys: {e}")
+        logger.error(f"Error in initializing API keys: {e}", exc_info=True)
         raise
 
 # Initialize API keys when the blueprint is created
@@ -50,38 +56,71 @@ def get_llm_response():
         is_user_message = data.get("is_user_message", False)
 
         if is_initial:
-            prompt = f"""You are starting a group discussion about "{topic}". Give a simple introduction in 40-50 words that sets the context and invites others to share their views. Use plain text without any special characters or emojis. Speak in a male voice."""
+            prompt = f"""You are starting a group discussion about "{topic}". Give a simple introduction in 40-50 words that sets the context and invites others to share their views. Use plain text without any special characters or emojis."""
         elif is_user_message:
-            prompt = f"""You are in a group discussion about "{topic}". A participant just said: "{text}". Respond directly to their point in 40-50 words. Use plain text without any special characters or emojis. Keep your response simple and conversational. Speak in a male voice."""
+            prompt = f"""You are in a group discussion about "{topic}". A participant just said: "{text}". Respond directly to their point in 40-50 words. Use plain text without any special characters or emojis. Keep your response simple and conversational."""
         else:
-            prompt = f"""You are in a group discussion about "{topic}". Respond in 40-50 words to: {text}. Use plain text without any special characters or emojis. Keep your response simple and conversational. Speak in a male voice."""
+            prompt = f"""You are in a group discussion about "{topic}". Respond in 40-50 words to: {text}. Use plain text without any special characters or emojis. Keep your response simple and conversational."""
 
-        completion = client.chat.completions.create(
-            extra_headers={
-                "HTTP-Referer": "http://localhost:8080",  # Your site URL
-                "X-Title": "Interactive GD",  # Your site name
-            },
-            model="google/gemini-pro",
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
-        )
+        # Log the request we're about to make
+        logger.info(f"Sending request to OpenRouter with prompt: {prompt}")
+        
+        try:
+            completion = client.chat.completions.create(
+                model="google/gemma-3-4b-it:free",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
+            )
+            
+            # Check if completion is None
+            if completion is None:
+                logger.error("Received None response from OpenRouter API")
+                return jsonify({"success": False, "error": "No response received from LLM API"}), 500
+                
+            # Log the raw response for debugging
+            logger.info(f"Received response from OpenRouter: {completion}")
+            
+            # First try the standard OpenAI format
+            try:
+                response_text = completion.choices[0].message.content.strip()
+            except (AttributeError, IndexError) as e:
+                logger.warning(f"Failed to get response in standard format: {e}")
+                # Try alternative response formats
+                if hasattr(completion, 'text'):
+                    response_text = completion.text.strip()
+                elif isinstance(completion, dict):
+                    if 'choices' in completion and len(completion['choices']) > 0:
+                        response_text = completion['choices'][0].get('message', {}).get('content', '').strip()
+                    else:
+                        response_text = completion.get('text', '').strip()
+                else:
+                    logger.error("Unable to extract response text from completion")
+                    return jsonify({"success": False, "error": "Invalid response format from LLM API"}), 500
+        except Exception as api_error:
+            logger.error(f"Error calling OpenRouter API: {str(api_error)}", exc_info=True)
+            return jsonify({"success": False, "error": f"API call failed: {str(api_error)}"}), 500
 
-        response_text = completion.choices[0].message.content.strip()
+        if not response_text:
+            logger.error("Empty response text from LLM API")
+            return jsonify({"success": False, "error": "Empty response from LLM API"}), 500
+
         if len(response_text.split()) > 55:
             response_text = ' '.join(response_text.split()[:50]) + '...'
+
+        logger.info(f"Response text: {response_text}")
 
         return jsonify({
             "success": True,
             "response": response_text,
-            "model_used": "google/gemini-pro"
+            "model_used": "google/gemma-3-4b-it:free"
         })
 
     except Exception as e:
-        logger.error(f"Error: {e}")
+        logger.error(f"Error in get_llm_response: {str(e)}", exc_info=True)
         return jsonify({"success": False, "error": str(e)}), 500
 
 @llm_bp.route('/api/llm1/tts', methods=['POST'])
@@ -92,8 +131,7 @@ def text_to_speech():
             return jsonify({"success": False, "error": "No text provided"}), 400
 
         text = data.get("text")
-        # Using 'co.uk' tld for a more British male voice and explicitly setting male voice parameters
-        tts = gTTS(text=text, lang='en', tld='co.uk', slow=False)
+        tts = gTTS(text=text, lang='en', tld='com.au')
         
         audio_stream = io.BytesIO()
         tts.write_to_fp(audio_stream)
@@ -107,7 +145,7 @@ def text_to_speech():
 # This is an alternative implementation if you want to try another option
 @llm_bp.route('/api/tts/alt', methods=['POST'])
 def alt_text_to_speech():
-    """Alternative TTS using pyttsx3 with a male voice."""
+    """Alternative TTS using pyttsx3 with a sweet female voice."""
     try:
         import pyttsx3
         import tempfile
@@ -125,10 +163,11 @@ def alt_text_to_speech():
         # Get available voices
         voices = engine.getProperty('voices')
         
-        # Select a male voice (usually the first voice is male)
+        # Select a female voice (index may vary by system)
+        # Usually the second voice (index 1) is female on most systems
         engine.setProperty('voice', voices[1].id)
         
-        # Set appropriate rate and volume for male voice
+        # Set a higher pitch for a sweeter sound
         engine.setProperty('rate', 150)  # Speed
         engine.setProperty('volume', 0.9)  # Volume
         
@@ -147,3 +186,36 @@ def alt_text_to_speech():
     except Exception as e:
         print(f"Error in pyttsx3 conversion: {e}")
         return jsonify({"success": False, "error": f"Alternative TTS failed: {str(e)}"}), 500
+
+@llm_bp.route('/api/llm1/test', methods=['GET'])
+def test_api_connection():
+    """Test endpoint to verify API connection and key validity."""
+    try:
+        # Simple test request
+        completion = client.chat.completions.create(
+            model="google/gemma-3-4b-it:free",
+            messages=[
+                {
+                    "role": "user",
+                    "content": "Hello, this is a test message."
+                }
+            ]
+        )
+        
+        if completion is None:
+            return jsonify({"success": False, "error": "No response received from API"}), 500
+            
+        # Try to extract a response
+        try:
+            response_text = completion.choices[0].message.content.strip()
+        except (AttributeError, IndexError):
+            response_text = "API responded but in unexpected format"
+            
+        return jsonify({
+            "success": True,
+            "message": "API connection successful",
+            "response": response_text
+        })
+    except Exception as e:
+        logger.error(f"API test failed: {str(e)}", exc_info=True)
+        return jsonify({"success": False, "error": f"API test failed: {str(e)}"}), 500

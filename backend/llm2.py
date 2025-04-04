@@ -164,6 +164,19 @@ def get_llm_response():
                         max_tokens=100
                     )
                     
+                    # Check if completion and completion.choices exist and have content
+                    if not completion or not hasattr(completion, 'choices') or not completion.choices:
+                        logger.error("Invalid completion response: missing choices")
+                        return jsonify({"success": False, "error": "Invalid response from LLM API: missing choices"}), 500
+                    
+                    if not completion.choices[0] or not hasattr(completion.choices[0], 'message'):
+                        logger.error("Invalid completion response: missing message")
+                        return jsonify({"success": False, "error": "Invalid response from LLM API: missing message"}), 500
+                    
+                    if not completion.choices[0].message or not hasattr(completion.choices[0].message, 'content'):
+                        logger.error("Invalid completion response: missing content")
+                        return jsonify({"success": False, "error": "Invalid response from LLM API: missing content"}), 500
+                    
                     llm_reply = completion.choices[0].message.content.strip()
                     
                     # Ensure the response is not too long

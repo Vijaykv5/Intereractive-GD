@@ -31,6 +31,9 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
   const [recognition, setRecognition] = useState<any>(null);
   const [error, setError] = useState<string>("");
   const audioRef = useRef<HTMLAudioElement>(null);
+  const speakingStartTimeRef = useRef<number | null>(null);
+  const totalSpeakingTimeRef = useRef<number>(0);
+  const sessionStartTimeRef = useRef<number>(Date.now());
   
   // Add conversation history tracking
   const conversationHistoryRef = useRef<Array<{role: string, content: string}>>([]);
@@ -150,8 +153,14 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
     try {
       if (recognitionStateRef.current) {
         recognition.stop();
+        if (speakingStartTimeRef.current) {
+          const speakingDuration = (Date.now() - speakingStartTimeRef.current) / 1000;
+          totalSpeakingTimeRef.current += speakingDuration;
+          speakingStartTimeRef.current = null;
+        }
       } else {
         recognition.start();
+        speakingStartTimeRef.current = Date.now();
       }
     } catch (err) {
       console.error(err);
@@ -253,7 +262,15 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
         const user = JSON.parse(localStorage.getItem("user") || "{}");
         if (user && user.user_id) {
           try {
-            const response = await fetch('http://localhost:8080/api/user/speech', {
+            // Calculate total session duration and speaking time
+            const totalDuration = (Date.now() - sessionStartTimeRef.current) / 1000;
+            if (speakingStartTimeRef.current) {
+              const speakingDuration = (Date.now() - speakingStartTimeRef.current) / 1000;
+              totalSpeakingTimeRef.current += speakingDuration;
+            }
+
+            // Store speech text
+            const speechResponse = await fetch('http://localhost:8080/api/user/speech', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -265,16 +282,36 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
               }),
             });
 
-            if (!response.ok) {
-              const errorData = await response.json();
-              console.error('Error saving to database:', errorData);
+            if (!speechResponse.ok) {
+              const errorData = await speechResponse.json();
+              console.error('Error saving speech to database:', errorData);
               setError('Failed to save speech to database');
-            } else {
-              console.log('Successfully saved speech to database');
             }
+
+            // Store speaking time
+            const speakingTimeResponse = await fetch('http://localhost:8080/api/user/speaking-time', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                user_id: user.user_id,
+                session_id: sessionId || Date.now().toString(),
+                speaking_duration: totalSpeakingTimeRef.current,
+                total_duration: totalDuration
+              }),
+            });
+
+            if (!speakingTimeResponse.ok) {
+              const errorData = await speakingTimeResponse.json();
+              console.error('Error saving speaking time to database:', errorData);
+              setError('Failed to save speaking time to database');
+            }
+
+            console.log('Successfully saved speech and speaking time to database');
           } catch (dbError) {
             console.error('Error saving to database:', dbError);
-            setError('Failed to save speech to database');
+            setError('Failed to save to database');
           }
         }
 
@@ -283,6 +320,11 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
         // Clear the speech text for next turn
         setSpeechText("");
       }
+      
+      // Reset speaking time tracking
+      totalSpeakingTimeRef.current = 0;
+      speakingStartTimeRef.current = null;
+      sessionStartTimeRef.current = Date.now();
       
       // Switch LLM for next response
       llmEndpointRef.current = llmEndpointRef.current === 'llm1' ? 'llm2' : 'llm1';
@@ -328,7 +370,7 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
       });
 
       const responseText = await response.text();
-      console.log('Raw response:', responseText);
+      console.log('Raw response:', response);
 
       let data;
       try {
