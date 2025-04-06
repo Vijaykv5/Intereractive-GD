@@ -70,7 +70,11 @@ const AnimatedParticipant: React.FC<AnimatedParticipantProps> = ({
         <motion.img
           src={participantId === 1 ? lips : lip2}
           alt="Lip animation"
-          className="absolute bottom-[76%] left-[46%] transform -translate-x-1/2 w-[34px] h-auto z-10"
+          className={`absolute transform -translate-x-1/2 w-[34px] h-auto z-10 ${
+            participantId === 1 
+              ? "bottom-[73%] left-[46%]" 
+              : "bottom-[76%] left-[46%]"
+          }`}
           initial={{ scale: 1, translateY: 0 }}
           animate={
             isAnimating

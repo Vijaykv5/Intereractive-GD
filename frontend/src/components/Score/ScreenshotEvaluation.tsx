@@ -38,6 +38,16 @@ interface EvaluationData {
   summary: ScreenshotSummary;
 }
 
+const LoadingScreen: React.FC = () => {
+  return (
+    <div className="fixed inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center z-50">
+      <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mb-4"></div>
+      <h2 className="text-2xl font-semibold text-gray-800 mb-2">Evaluating your results</h2>
+      <p className="text-gray-600">Please wait while we process your data...</p>
+    </div>
+  );
+};
+
 const ScreenshotEvaluation: React.FC<{ userId: string }> = ({ userId }) => {
   const [evaluationData, setEvaluationData] = useState<EvaluationData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,57 +91,112 @@ const ScreenshotEvaluation: React.FC<{ userId: string }> = ({ userId }) => {
     };
   };
 
-  if (loading) return <div className="text-center py-4">Loading evaluation data...</div>;
-  if (error) return <div className="text-red-500 text-center py-4">{error}</div>;
-  if (!evaluationData) return <div className="text-center py-4">No evaluation data available</div>;
+  if (loading) return <LoadingScreen />;
+  
+  if (error) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+        <p className="text-red-600">{error}</p>
+      </div>
+    </div>
+  );
+  
+  if (!evaluationData) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <p className="text-gray-600">No evaluation data available</p>
+      </div>
+    </div>
+  );
 
   const scores = calculateScores();
 
   return (
-    <div className="p-5 max-w-4xl mx-auto">
-      <h2 className="text-2xl font-semibold text-gray-800 mb-6 text-center">
+    <div className="p-6 max-w-5xl mx-auto bg-gradient-to-br from-gray-50 to-white rounded-xl shadow-lg">
+      <h2 className="text-3xl font-bold text-gray-800 mb-8 text-center">
         Screenshot Evaluation Results
       </h2>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="bg-white p-5 rounded-lg shadow-md">
-          <h3 className="text-lg font-medium text-gray-700 mb-4">Screenshot Summary</h3>
-          <p className="text-gray-600 mb-2">Total Screenshots: {evaluationData.summary.total_screenshots}</p>
-          <p className="text-gray-600">Valid Screenshots: {evaluationData.summary.valid_screenshots}</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-lg shadow-md">
-          <h3 className="text-lg font-medium text-gray-700 mb-4">Attention Metrics</h3>
-          <p className="text-gray-600 mb-2">Eyes Closed Count: {evaluationData.summary.attention_metrics.eyes_closed_count}</p>
-          <p className="text-gray-600">Head Turned Count: {evaluationData.summary.attention_metrics.head_turned_count}</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-lg shadow-md">
-          <h3 className="text-lg font-medium text-gray-700 mb-4">Scores</h3>
-          <p className="text-gray-600 mb-2">Eye Score: {scores.eyeScore}%</p>
-          <p className="text-gray-600 mb-2">Face Score: {scores.faceScore}%</p>
-          <p className="text-gray-600 font-semibold">Average Score: {scores.averageScore}%</p>
-        </div>
-      </div>
-
-      {/* Face Detection Results */}
-      <div className="mt-6 bg-white p-5 rounded-lg shadow-md">
-        <h3 className="text-lg font-medium text-gray-700 mb-4">Frame Analysis</h3>
-        {evaluationData.screenshots.map((screenshot, index) => (
-          <div key={index} className="mb-4 p-4 border rounded">
-            <h4 className="font-medium text-gray-700 mb-2">Screenshot {index + 1}</h4>
-            {screenshot.error ? (
-              <p className="text-red-500">{screenshot.error}</p>
-            ) : (
-              <div>
-                <p className={`mb-2 ${screenshot.analysis?.face_detection.frame_status.includes("good") ? "text-green-500" : "text-red-500"}`}>
-                  {screenshot.analysis?.face_detection.frame_status}
-                </p>
-                <p className="text-gray-600">Total Faces Detected: {screenshot.analysis?.face_detection.total_faces}</p>
-              </div>
-            )}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100 hover:shadow-lg transition-shadow duration-300">
+          <h3 className="text-xl font-semibold text-gray-700 mb-4 flex items-center">
+            <svg className="w-6 h-6 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Screenshot Summary
+          </h3>
+          <div className="space-y-3">
+            <p className="text-gray-600 flex items-center">
+              <span className="font-medium">Total Screenshots:</span>
+              <span className="ml-2 text-gray-800">{evaluationData.summary.total_screenshots}</span>
+            </p>
+            <p className="text-gray-600 flex items-center">
+              <span className="font-medium">Valid Screenshots:</span>
+              <span className="ml-2 text-gray-800">{evaluationData.summary.valid_screenshots}</span>
+            </p>
           </div>
-        ))}
+        </div>
+
+        <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100 hover:shadow-lg transition-shadow duration-300">
+          <h3 className="text-xl font-semibold text-gray-700 mb-4 flex items-center">
+            <svg className="w-6 h-6 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Attention Metrics
+          </h3>
+          <div className="space-y-3">
+            <p className="text-gray-600 flex items-center">
+              <span className="font-medium">Eyes Closed Count:</span>
+              <span className="ml-2 text-gray-800">{evaluationData.summary.attention_metrics.eyes_closed_count}</span>
+            </p>
+            <p className="text-gray-600 flex items-center">
+              <span className="font-medium">Head Turned Count:</span>
+              <span className="ml-2 text-gray-800">{evaluationData.summary.attention_metrics.head_turned_count}</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100 hover:shadow-lg transition-shadow duration-300">
+          <h3 className="text-xl font-semibold text-gray-700 mb-4 flex items-center">
+            <svg className="w-6 h-6 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+            </svg>
+            Scores
+          </h3>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-600 font-medium">Eye Score:</span>
+              <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                scores.eyeScore >= 80 ? 'bg-green-100 text-green-800' :
+                scores.eyeScore >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                'bg-red-100 text-red-800'
+              }`}>
+                {scores.eyeScore}%
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-gray-600 font-medium">Face Score:</span>
+              <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                scores.faceScore >= 80 ? 'bg-green-100 text-green-800' :
+                scores.faceScore >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                'bg-red-100 text-red-800'
+              }`}>
+                {scores.faceScore}%
+              </span>
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <span className="text-gray-800 font-semibold">Average Score:</span>
+              <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                scores.averageScore >= 80 ? 'bg-green-100 text-green-800' :
+                scores.averageScore >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                'bg-red-100 text-red-800'
+              }`}>
+                {scores.averageScore}%
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

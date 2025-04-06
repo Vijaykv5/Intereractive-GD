@@ -133,7 +133,7 @@ const Video: React.FC<VideoProps> = ({
         )}
 
         {/* Video Toggle */}
-        <button
+        {/* <button
           onClick={toggleVideo}
           className={`absolute bottom-4 right-4 p-3 rounded-full transition-all shadow-lg backdrop-blur-sm ${
             isVideoOn
@@ -146,7 +146,7 @@ const Video: React.FC<VideoProps> = ({
           ) : (
             <VideoOff className="w-6 h-6 text-white" />
           )}
-        </button>
+        </button> */}
       </div>
     </div>
   );

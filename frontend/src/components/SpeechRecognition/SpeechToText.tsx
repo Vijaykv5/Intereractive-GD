@@ -48,6 +48,9 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
   const aiSpeakingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [currentParticipant, setCurrentParticipant] = useState<number | null>(null);
+  
+  // Add a lock to prevent multiple LLMs from interacting at the same time
+  const llmLockRef = useRef<boolean>(false);
 
   // Function to update conversation history
   const updateConversationHistory = (role: string, content: string) => {
@@ -124,6 +127,13 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
         recognitionInstance.onend = () => {
           recognitionStateRef.current = false;
           setIsListening(false);
+          
+          // Update speaking time when recognition ends
+          if (speakingStartTimeRef.current) {
+            const speakingDuration = (Date.now() - speakingStartTimeRef.current) / 1000;
+            totalSpeakingTimeRef.current += speakingDuration;
+            speakingStartTimeRef.current = null;
+          }
         };
 
         setRecognition(recognitionInstance);
@@ -156,11 +166,13 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
         if (speakingStartTimeRef.current) {
           const speakingDuration = (Date.now() - speakingStartTimeRef.current) / 1000;
           totalSpeakingTimeRef.current += speakingDuration;
+          console.log('Updated speaking time in toggleListening:', totalSpeakingTimeRef.current);
           speakingStartTimeRef.current = null;
         }
       } else {
         recognition.start();
         speakingStartTimeRef.current = Date.now();
+        console.log('Started speaking time tracking');
       }
     } catch (err) {
       console.error(err);
@@ -246,6 +258,9 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
       // Stop browser speech synthesis if active
       window.speechSynthesis.cancel();
       
+      // Release the LLM lock if it was held
+      llmLockRef.current = false;
+      
       // Start listening immediately when hand is raised
       if (recognition && !recognitionStateRef.current) {
         recognition.start();
@@ -255,6 +270,13 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
       setIsHandRaised(false);
       if (recognition && recognitionStateRef.current) {
         recognition.stop();
+        
+        // Update speaking time when stopping recognition
+        if (speakingStartTimeRef.current) {
+          const speakingDuration = (Date.now() - speakingStartTimeRef.current) / 1000;
+          totalSpeakingTimeRef.current += speakingDuration;
+          speakingStartTimeRef.current = null;
+        }
       }
       
       // Store the complete speech in MongoDB
@@ -268,6 +290,9 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
               const speakingDuration = (Date.now() - speakingStartTimeRef.current) / 1000;
               totalSpeakingTimeRef.current += speakingDuration;
             }
+
+            console.log('Speaking time before saving:', totalSpeakingTimeRef.current);
+            console.log('Total duration:', totalDuration);
 
             // Store speech text
             const speechResponse = await fetch('http://localhost:8080/api/user/speech', {
@@ -338,6 +363,15 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
         console.log('User has the floor, preventing LLM response');
         return;
       }
+      
+      // Check if another LLM is already processing
+      if (llmLockRef.current) {
+        console.log('Another LLM is already processing, preventing concurrent interaction');
+        return;
+      }
+      
+      // Acquire the lock
+      llmLockRef.current = true;
 
       const endpoint = llmEndpointRef.current;
       console.log(`Attempting to connect to LLM endpoint: ${endpoint}`);
@@ -455,6 +489,8 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
               if (aiSpeakingTimeoutRef.current) {
                 clearTimeout(aiSpeakingTimeoutRef.current);
               }
+              // Release the lock when interrupted
+              llmLockRef.current = false;
             }
           };
 
@@ -470,6 +506,9 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
               participantId: speakingParticipant
             }, '*');
             audioRef.current?.removeEventListener('pause', handleInterruption);
+            
+            // Release the lock when audio ends
+            llmLockRef.current = false;
             
             // Add 3-second delay before next AI response
             aiSpeakingTimeoutRef.current = setTimeout(async () => {
@@ -503,6 +542,8 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
           if (aiSpeakingTimeoutRef.current) {
             clearTimeout(aiSpeakingTimeoutRef.current);
           }
+          // Release the lock when interrupted
+          llmLockRef.current = false;
         };
         
         utterance.onend = () => {
@@ -512,6 +553,10 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
             type: 'participant_stopped_speaking',
             participantId: speakingParticipant
           }, '*');
+          
+          // Release the lock when audio ends
+          llmLockRef.current = false;
+          
           // Add 3-second delay before next AI response
           aiSpeakingTimeoutRef.current = setTimeout(async () => {
             if (!isHandRaised && !isListening) {
@@ -534,6 +579,8 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
         type: 'participant_stopped_speaking',
         participantId: currentParticipant
       }, '*');
+      // Release the lock on error
+      llmLockRef.current = false;
     }
   };
 
@@ -543,6 +590,8 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
       if (aiSpeakingTimeoutRef.current) {
         clearTimeout(aiSpeakingTimeoutRef.current);
       }
+      // Release the lock on component unmount
+      llmLockRef.current = false;
     };
   }, []);
 
@@ -604,17 +653,7 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({
             )}
           </div>
 
-          <button
-            onClick={handleSave}
-            className={`p-4 rounded-full transition-all ${
-              speechText
-                ? "bg-green-600 hover:bg-green-700 cursor-pointer"
-                : "bg-gray-700 cursor-not-allowed"
-            }`}
-            disabled={!speechText || isAISpeaking}
-          >
-            <Save className="w-6 h-6 text-white" />
-          </button>
+           
         </div>
       </div>
     </div>
