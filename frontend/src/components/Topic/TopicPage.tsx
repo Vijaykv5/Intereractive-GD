@@ -23,7 +23,7 @@ const TopicPage = () => {
   const storedTimeLeft = localStorage.getItem("timeLeft");
   
   const [topic, setTopic] = useState(storedTopic || topics[0]);
-  const [timeLeft, setTimeLeft] = useState(storedTimeLeft ? parseInt(storedTimeLeft) : 60);
+  const [timeLeft, setTimeLeft] = useState(storedTimeLeft ? parseInt(storedTimeLeft) : 20);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -75,8 +75,8 @@ const TopicPage = () => {
     setTopic(newTopic);
     localStorage.setItem("currentTopic", newTopic);
     // Reset timer to 60 seconds when topic changes
-    setTimeLeft(60);
-    localStorage.setItem("timeLeft", "60");
+    setTimeLeft(20);
+    localStorage.setItem("timeLeft", "20");
   };
 
   return (

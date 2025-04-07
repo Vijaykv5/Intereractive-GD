@@ -8,6 +8,9 @@ import logging
 import requests
 import os
 from dotenv import load_dotenv
+import textstat
+import language_tool_python
+from collections import Counter
 
 # Create a Blueprint for user data routes
 user_data_bp = Blueprint('user_data', __name__)
@@ -856,6 +859,120 @@ def get_speaking_stats(user_id):
         
     except Exception as e:
         logger.error(f"Error listing users: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    
+def evaluate_text_speech(text_list):
+    tool = language_tool_python.LanguageTool('en-US')
+    readability_scores = []
+    grammar_scores = []
+    repetitiveness_scores = []
+    
+    for text in text_list:
+        if not text.strip():  # Check for empty text
+            readability_scores.append(0)
+            grammar_scores.append(0)
+            repetitiveness_scores.append(0)
+            continue
+        
+        # Readability Score (Flesch-Kincaid Index)
+        readability = textstat.flesch_reading_ease(text)
+        if readability > 70:
+            readability_score = 100
+        elif 50 <= readability <= 70:
+            readability_score = 70
+        else:
+            readability_score = 40
+        readability_scores.append(readability_score)
+        
+        # Grammar & Spelling Check
+        matches = tool.check(text)
+        num_errors = len(matches)
+        if num_errors == 0:
+            grammar_score = 100
+        elif num_errors <= 5:
+            grammar_score = 80
+        elif num_errors <= 10:
+            grammar_score = 60
+        else:
+            grammar_score = 40
+        grammar_scores.append(grammar_score)
+        
+        # Repetitiveness Detection
+        words = text.lower().split()
+        word_counts = Counter(words)
+        repeated_words = {word: count for word, count in word_counts.items() if count > 3}
+        repetitiveness = len(repeated_words)
+        
+        if repetitiveness == 0:
+            repetitiveness_score = 100
+        elif repetitiveness <= 3:
+            repetitiveness_score = 80
+        elif repetitiveness <= 6:
+            repetitiveness_score = 60
+        else:
+            repetitiveness_score = 40
+        repetitiveness_scores.append(repetitiveness_score)
+    
+    # Final Percentage Scores
+    final_readability = sum(readability_scores) / len(text_list)
+    final_grammar = sum(grammar_scores) / len(text_list)
+    final_repetitiveness = sum(repetitiveness_scores) / len(text_list)
+    
+    return {
+        "final_readability_score": final_readability,
+        "final_grammar_score": final_grammar,
+        "final_repetitiveness_score": final_repetitiveness
+    }
+    
+@user_data_bp.route('/api/grammar/<user_id>', methods=['GET'])
+def get_grammar_scores(user_id):
+    try:
+        logger.info(f"Received request for grammar scores for user_id: {user_id}")
+        
+        # Get user's text data from the database
+        from auth import db
+        logger.info("Successfully imported db from auth")
+
+        
+        collection = get_user_speech_collection(db)
+        logger.info(f"Querying speech collection for user_id: {user_id}")
+        
+        # Find the user document
+        user_doc = collection.find_one({"user_id": str(user_id)})
+        if not user_doc:
+            logger.info(f"No user document found for user_id: {user_id}")
+            return jsonify({
+                "final_readability_score": 0,
+                "final_grammar_score": 0,
+                "final_repetitiveness_score": 0
+            })
+        
+        # Extract texts from speech_entries
+        user_texts = []
+        if "speech_entries" in user_doc and isinstance(user_doc["speech_entries"], list):
+            for entry in user_doc["speech_entries"]:
+                if isinstance(entry, dict) and "text" in entry:
+                    user_texts.append(entry["text"])
+        
+        logger.info(f"Extracted {len(user_texts)} texts from speech entries")
+        
+        if not user_texts:
+            logger.info(f"No speech texts found for user_id: {user_id}")
+            return jsonify({
+                "final_readability_score": 0,
+                "final_grammar_score": 0,
+                "final_repetitiveness_score": 0
+            })
+        
+        # Evaluate the texts
+        logger.info("Starting text evaluation")
+        scores = evaluate_text_speech(user_texts)
+        logger.info(f"Evaluation complete. Scores: {scores}")
+        
+        return jsonify(scores)
+    except Exception as e:
+        logger.error(f"Error in grammar evaluation: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"success": False, "error": str(e)}), 500
     
 

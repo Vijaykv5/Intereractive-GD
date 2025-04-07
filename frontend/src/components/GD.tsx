@@ -25,7 +25,7 @@ const topics = [
 const GD: React.FC = () => {
   const navigate = useNavigate();
   const [topic, setTopic] = useState<string>("");
-  const [timeLeft, setTimeLeft] = useState<number>(240); // 4 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState<number>(60); // 4 minutes in seconds
   const [initialTimer, setInitialTimer] = useState<number>(10); // 10 seconds initial timer
   const [canLLMsStart, setCanLLMsStart] = useState<boolean>(false);
   const [speakingParticipant, setSpeakingParticipant] = useState<number | null>(null);

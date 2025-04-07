@@ -15,6 +15,7 @@ import {
 import GDEvaluation from "./GDEvaluation";
 import ScreenshotEvaluation from "./ScreenshotEvaluation";
 import SpeakingTimeScore from "./SpeakingTimeScore";
+import GrammarEvaluation from './GrammarEvaluation';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -136,6 +137,7 @@ export default function Dashboard() {
             {userId && <GDEvaluation userId={userId} />}
             {userId && <ScreenshotEvaluation userId={userId} />}
             {userId && <SpeakingTimeScore userId={userId} />}
+            {userId && <GrammarEvaluation userId={userId} />}
 
             {/* Tabs */}
             
